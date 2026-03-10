@@ -10,8 +10,12 @@ permissions:
   contents: read
 
 jobs:
-  backend-test:
+  backend:
+    name: Backend (Go)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - uses: actions/checkout@v4
 
@@ -19,20 +23,27 @@ jobs:
         with:
           go-version-file: backend/go.mod
 
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Verify go.sum
+        run: go mod verify
+
       - name: Build
-        working-directory: backend
         run: go build ./...
 
-      - name: Test
-        working-directory: backend
-        run: go test ./... -count=1 -race
-
       - name: Vet
-        working-directory: backend
         run: go vet ./...
 
-  frontend-build:
+      - name: Test
+        run: go test ./... -count=1 -race
+
+  frontend:
+    name: Frontend (Angular)
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
     steps:
       - uses: actions/checkout@v4
 
@@ -42,23 +53,20 @@ jobs:
           cache: npm
           cache-dependency-path: ui/package-lock.json
 
-      - name: Install
-        working-directory: ui
+      - name: Install dependencies
         run: npm ci
 
       - name: Build
-        working-directory: ui
         run: npx ng build --configuration=production
 
-  helm-lint:
+  helm:
+    name: Helm Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: azure/setup-helm@v4
-        with:
-          version: v3.17.0
 
-      - name: Lint
-        run: helm lint ./deploy/helm/seebom
+      - name: Lint chart
+        run: helm lint deploy/helm/seebom/
 

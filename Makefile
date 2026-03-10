@@ -144,18 +144,18 @@ images: ## Build all container images locally (TAG=dev)
 	docker build -t $(REGISTRY)/$(REPO)/ingestion-watcher:$(TAG) --target ingestion-watcher backend/
 	docker build -t $(REGISTRY)/$(REPO)/parsing-worker:$(TAG)    --target parsing-worker    backend/
 	docker build -t $(REGISTRY)/$(REPO)/api-gateway:$(TAG)       --target api-gateway       backend/
+	docker build -t $(REGISTRY)/$(REPO)/cve-refresher:$(TAG)     --target cve-refresher     backend/
 	docker build -t $(REGISTRY)/$(REPO)/ui:$(TAG) ui/
-	@echo "✅ Built 4 images with tag $(TAG)"
+	@echo "✅ Built 5 images with tag $(TAG)"
 
 images-push: images ## Build and push all images to GHCR (TAG=dev)
 	docker push $(REGISTRY)/$(REPO)/ingestion-watcher:$(TAG)
 	docker push $(REGISTRY)/$(REPO)/parsing-worker:$(TAG)
 	docker push $(REGISTRY)/$(REPO)/api-gateway:$(TAG)
+	docker push $(REGISTRY)/$(REPO)/cve-refresher:$(TAG)
 	docker push $(REGISTRY)/$(REPO)/ui:$(TAG)
-	@echo "✅ Pushed 4 images to $(REGISTRY)/$(REPO) with tag $(TAG)"
+	@echo "✅ Pushed 5 images to $(REGISTRY)/$(REPO) with tag $(TAG)"
 
-ui-build: ## Build Angular for production
-	cd ui && npx ng build --configuration=production
 
 # ─── GitHub ──────────────────────────────────────────────────────────────────
 sync-labels: ## Sync GitHub labels from .github/labels.yml (requires gh + yq)

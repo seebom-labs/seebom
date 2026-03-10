@@ -10,7 +10,8 @@ All container images are published to **GitHub Container Registry (ghcr.io)**:
 |-------|-------------|
 | `ghcr.io/seebom-labs/seebom/ingestion-watcher` | CronJob: scans SBOM/VEX files, enqueues jobs |
 | `ghcr.io/seebom-labs/seebom/parsing-worker` | Stateless worker: parses SBOMs, queries OSV, checks licenses |
-| `ghcr.io/seebom-labs/seebom/api-gateway` | REST API (16 endpoints) |
+| `ghcr.io/seebom-labs/seebom/api-gateway` | REST API (17 endpoints) |
+| `ghcr.io/seebom-labs/seebom/cve-refresher` | CronJob: daily incremental CVE checks against OSV |
 | `ghcr.io/seebom-labs/seebom/ui` | Angular frontend (Nginx) |
 
 Images are built for **linux/amd64** and **linux/arm64**.
@@ -30,12 +31,25 @@ git push origin v0.1.0
 
 The GitHub Actions workflow (`.github/workflows/release.yml`) triggers on any `v*` tag and:
 
-1. **Builds all 4 container images** (multi-arch: amd64 + arm64)
+1. **Builds all 5 container images** (multi-arch: amd64 + arm64)
 2. **Pushes them to ghcr.io** with two tags each:
    - `ghcr.io/seebom-labs/seebom/<component>:0.1.0` (version)
    - `ghcr.io/seebom-labs/seebom/<component>:latest`
 3. **Packages the Helm chart** with the matching version
 4. **Pushes the Helm chart** as an OCI artifact to `oci://ghcr.io/seebom-labs/seebom/charts`
+5. **Creates a GitHub Release** with:
+   - Auto-generated release notes from commits since the last tag
+   - `docker pull` commands for all 5 images
+   - `helm install` command for the chart
+   - Pre-release flag for `-rc`, `-alpha`, `-beta` tags
+
+Release notes are grouped by PR labels (see `.github/release.yml`):
+- 🚀 Features (`enhancement`, `feature`)
+- 🐛 Bug Fixes (`bug`, `fix`)
+- 📖 Documentation (`docs`)
+- 🧪 Tests (`test`)
+- 🔧 Maintenance (`chore`, `dependencies`, `ci`)
+- 🔒 Security (`security`)
 
 ### 3. Verify the release
 
@@ -74,7 +88,36 @@ helm install seebom oci://ghcr.io/seebom-labs/seebom/charts/seebom \
 | Workflow | File | Trigger | What it does |
 |----------|------|---------|-------------|
 | **CI** | `.github/workflows/ci.yml` | Push/PR to `main` | Go build + test + vet, Angular build, Helm lint |
-| **Release** | `.github/workflows/release.yml` | Git tag `v*` | Build + push 4 images (multi-arch), package + push Helm chart |
+| **Release** | `.github/workflows/release.yml` | Git tag `v*` | Build + push 5 images (multi-arch), Helm chart, GitHub Release |
+| **Pre-Release** | `.github/workflows/pre-release.yml` | Manual (`workflow_dispatch`) | Build images from any branch, create pre-release |
+| **Sync Labels** | `.github/workflows/sync-labels.yml` | Push to `main` (labels.yml changed) or manual | Sync `.github/labels.yml` to GitHub repo labels |
+| **Auto-Label** | `.github/workflows/labeler.yml` | PR opened/updated | Auto-assigns labels based on changed files (`.github/labeler.yml`) |
+
+---
+
+## Fork-Based Workflow
+
+If you contribute via a fork:
+
+1. **Develop in your fork** — push branches, open PRs against the main repo
+2. **Merge the PR** into `main` of the main repo
+3. **Tag in the main repo** (not in the fork):
+   ```bash
+   git tag v0.1.0
+   git push origin v0.1.0
+   ```
+
+> **Do not tag releases in your fork.** The `GITHUB_TOKEN` in a fork cannot push images to the main repo's GHCR, and the GitHub Release would be created in the fork instead of the main repo.
+
+### Testing a pre-release from any branch
+
+Use the manual **Pre-Release** workflow to build and publish test images without merging to `main`:
+
+1. Go to **Actions → Pre-Release (manual)** in your repo
+2. Click **Run workflow**
+3. Select the branch and enter a version (e.g. `0.2.0-rc1`)
+4. Images are pushed to your repo's GHCR with that version tag
+5. A GitHub Pre-Release is created automatically
 
 ---
 
@@ -83,7 +126,7 @@ helm install seebom oci://ghcr.io/seebom-labs/seebom/charts/seebom \
 For testing before a release:
 
 ```bash
-# Build all 4 images with tag "dev"
+# Build all 5 images with tag "dev"
 make images
 
 # Build with a specific tag
@@ -120,11 +163,13 @@ The backend uses a **single multi-stage Dockerfile** (`backend/Dockerfile`) with
 golang:1.24-alpine (builder)
   ├── go build → /bin/ingestion-watcher
   ├── go build → /bin/parsing-worker
-  └── go build → /bin/api-gateway
+  ├── go build → /bin/api-gateway
+  └── go build → /bin/cve-refresher
 
 alpine:3.21 (ingestion-watcher)  ← FROM builder, COPY binary
 alpine:3.21 (parsing-worker)     ← FROM builder, COPY binary
 alpine:3.21 (api-gateway)        ← FROM builder, COPY binary
+alpine:3.21 (cve-refresher)      ← FROM builder, COPY binary
 ```
 
 The UI uses a separate Dockerfile (`ui/Dockerfile`):

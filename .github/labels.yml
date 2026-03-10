@@ -1,166 +1,97 @@
-# SeeBOM GitHub Labels
-#
-# Apply with:  gh label create --force -R seebom-labs/seebom \
-#                "name" --description "desc" --color "hex"
-#
-# Or use the script:  .github/scripts/sync-labels.sh
+## Labels for GitHub Issues and PRs
+## Synced automatically via .github/workflows/sync-labels.yml
+## Manual sync: make sync-labels (requires gh CLI)
 
-# ── Type ─────────────────────────────────────────────────────
-- name: "bug"
-  color: "C43030"
-  description: "Something isn't working"
-
-- name: "enhancement"
-  color: "1A8A8A"
+# ─── Release Notes Categories ────────────────────────────────────────────────
+- name: enhancement
+  color: "a2eeef"
   description: "New feature or improvement"
 
-- name: "documentation"
-  color: "4A4A4A"
-  description: "Documentation improvement"
+- name: feature
+  color: "0075ca"
+  description: "New feature request"
 
-- name: "question"
-  color: "D4A843"
-  description: "Further information is requested"
+- name: bug
+  color: "d73a4a"
+  description: "Something isn't working"
 
-- name: "security"
-  color: "C43030"
-  description: "Security-related issue or vulnerability"
+- name: fix
+  color: "e4e669"
+  description: "Bug fix"
 
-# ── Priority ─────────────────────────────────────────────────
-- name: "priority/critical"
-  color: "C43030"
-  description: "Must be fixed immediately"
+- name: documentation
+  color: "0075ca"
+  description: "Documentation changes"
 
-- name: "priority/high"
-  color: "E8871E"
-  description: "Important, should be fixed soon"
+- name: docs
+  color: "0075ca"
+  description: "Documentation changes"
 
-- name: "priority/medium"
-  color: "D4A843"
-  description: "Should be fixed, but not urgent"
+- name: test
+  color: "bfd4f2"
+  description: "Test improvements"
 
-- name: "priority/low"
-  color: "6b7280"
-  description: "Nice to have, fix when convenient"
+- name: testing
+  color: "bfd4f2"
+  description: "Test improvements"
 
-# ── Component ────────────────────────────────────────────────
-- name: "component/api-gateway"
-  color: "147272"
-  description: "Affects the Go API Gateway"
+- name: security
+  color: "ee0701"
+  description: "Security related changes"
 
-- name: "component/parsing-worker"
-  color: "147272"
-  description: "Affects the Go Parsing Worker"
+# ─── Maintenance ─────────────────────────────────────────────────────────────
+- name: chore
+  color: "fef2c0"
+  description: "Maintenance and housekeeping"
 
-- name: "component/ingestion-watcher"
-  color: "147272"
-  description: "Affects the Go Ingestion Watcher (CronJob)"
+- name: dependencies
+  color: "0366d6"
+  description: "Dependency updates"
 
-- name: "component/ui"
-  color: "147272"
-  description: "Affects the Angular frontend"
+- name: ci
+  color: "e1e4e8"
+  description: "CI/CD pipeline changes"
 
-- name: "component/clickhouse"
-  color: "147272"
-  description: "Affects ClickHouse schema or queries"
+# ─── Components ──────────────────────────────────────────────────────────────
+- name: backend
+  color: "00ADD8"
+  description: "Go backend (API, workers, parsers)"
 
-- name: "component/helm"
-  color: "147272"
-  description: "Affects Helm chart or Kubernetes deployment"
+- name: frontend
+  color: "DD0031"
+  description: "Angular UI"
 
-- name: "component/ci"
-  color: "147272"
-  description: "Affects CI/CD pipelines or GitHub Actions"
+- name: helm
+  color: "0F1689"
+  description: "Helm chart / Kubernetes deployment"
 
-# ── Domain ───────────────────────────────────────────────────
-- name: "area/sbom"
-  color: "0D6B5E"
-  description: "Related to SBOM ingestion or parsing"
+- name: clickhouse
+  color: "FFCC00"
+  description: "ClickHouse schema or queries"
 
-- name: "area/vulnerability"
-  color: "0D6B5E"
-  description: "Related to vulnerability scanning (OSV)"
+# ─── Priority ────────────────────────────────────────────────────────────────
+- name: "priority: critical"
+  color: "b60205"
+  description: "Must be resolved immediately"
 
-- name: "area/license"
-  color: "0D6B5E"
-  description: "Related to license compliance or policy"
+- name: "priority: high"
+  color: "d93f0b"
+  description: "Should be resolved soon"
 
-- name: "area/vex"
-  color: "0D6B5E"
-  description: "Related to VEX (Vulnerability Exploitability eXchange)"
+- name: "priority: low"
+  color: "c2e0c6"
+  description: "Nice to have"
 
-- name: "area/search"
-  color: "0D6B5E"
-  description: "Related to CVE impact, dependency stats, or cross-project search"
-
-- name: "area/theming"
-  color: "0D6B5E"
-  description: "Related to UI theming, dark mode, or custom CSS"
-
-# ── Status ───────────────────────────────────────────────────
-- name: "triage"
-  color: "D4A843"
-  description: "Needs triage by a maintainer"
-
-- name: "accepted"
-  color: "1A8A8A"
-  description: "Accepted and ready for implementation"
-
-- name: "wontfix"
-  color: "6b7280"
-  description: "This will not be worked on"
-
-- name: "duplicate"
-  color: "6b7280"
-  description: "This issue or PR already exists"
-
-- name: "needs-info"
-  color: "D4A843"
-  description: "More information needed from the reporter"
-
-- name: "blocked"
-  color: "C43030"
-  description: "Blocked by another issue or external dependency"
-
-# ── Effort ───────────────────────────────────────────────────
-- name: "size/xs"
-  color: "e0e2e6"
-  description: "Extra small – trivial change, < 1 hour"
-
-- name: "size/s"
-  color: "b0b0b0"
-  description: "Small – a few files, < 1 day"
-
-- name: "size/m"
-  color: "9ca3af"
-  description: "Medium – multiple components, 1-3 days"
-
-- name: "size/l"
-  color: "6b7280"
-  description: "Large – significant effort, 3-5 days"
-
-- name: "size/xl"
-  color: "4A4A4A"
-  description: "Extra large – major feature, > 1 week"
-
-# ── Special ──────────────────────────────────────────────────
+# ─── Status ──────────────────────────────────────────────────────────────────
 - name: "good first issue"
-  color: "1A8A8A"
-  description: "Good for newcomers to the project"
+  color: "7057ff"
+  description: "Good for newcomers"
 
 - name: "help wanted"
-  color: "E8871E"
+  color: "008672"
   description: "Extra attention is needed"
 
-- name: "breaking-change"
-  color: "C43030"
-  description: "Introduces a breaking change"
-
-- name: "dependencies"
-  color: "4A4A4A"
-  description: "Dependency update (Go modules, npm packages)"
-
-- name: "performance"
-  color: "E8871E"
-  description: "Performance improvement"
+- name: skip-changelog
+  color: "ededed"
+  description: "Exclude from auto-generated release notes"
 

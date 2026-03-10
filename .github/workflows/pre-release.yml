@@ -1,0 +1,98 @@
+name: Pre-Release (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. 0.2.0-rc1)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  REPO: ${{ github.repository }}
+
+jobs:
+  images:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component:
+          - name: ingestion-watcher
+            context: backend
+            target: ingestion-watcher
+          - name: parsing-worker
+            context: backend
+            target: parsing-worker
+          - name: api-gateway
+            context: backend
+            target: api-gateway
+          - name: cve-refresher
+            context: backend
+            target: cve-refresher
+          - name: ui
+            context: ui
+            target: ""
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.component.context }}
+          target: ${{ matrix.component.target || '' }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.REPO }}/${{ matrix.component.name }}:${{ inputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  github-release:
+    name: Create Pre-Release
+    runs-on: ubuntu-latest
+    needs: images
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create tag
+        run: |
+          git tag "v${{ inputs.version }}"
+          git push origin "v${{ inputs.version }}"
+
+      - name: Create GitHub Pre-Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: SeeBOM ${{ inputs.version }}
+          generate_release_notes: true
+          body: |
+            > ⚠️ **Pre-release** — built from branch `${{ github.ref_name }}`
+
+            ## Container Images
+
+            ```
+            docker pull ${{ env.REGISTRY }}/${{ env.REPO }}/api-gateway:${{ inputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ env.REPO }}/parsing-worker:${{ inputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ env.REPO }}/ingestion-watcher:${{ inputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ env.REPO }}/cve-refresher:${{ inputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ env.REPO }}/ui:${{ inputs.version }}
+            ```
+          draft: false
+          prerelease: true
+

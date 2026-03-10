@@ -1,0 +1,52 @@
+# Auto-label PRs based on changed files
+# Docs: https://github.com/actions/labeler
+
+backend:
+  - changed-files:
+      - any-glob-to-any-file: 'backend/**'
+
+frontend:
+  - changed-files:
+      - any-glob-to-any-file: 'ui/**'
+
+helm:
+  - changed-files:
+      - any-glob-to-any-file: 'deploy/**'
+
+clickhouse:
+  - changed-files:
+      - any-glob-to-any-file: 'db/**'
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '*.md'
+          - 'docs/**'
+          - 'AGENTS.md'
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: '.github/**'
+
+test:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'backend/**/*_test.go'
+          - 'ui/**/*.spec.ts'
+
+security:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'SECURITY.md'
+          - 'backend/internal/osv/**'
+          - 'backend/internal/osvutil/**'
+          - 'backend/cmd/cve-refresher/**'
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'backend/go.mod'
+          - 'backend/go.sum'
+          - 'ui/package.json'
+          - 'ui/package-lock.json'
+
