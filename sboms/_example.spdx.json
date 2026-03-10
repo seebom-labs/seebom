@@ -1,0 +1,61 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "example-app",
+  "documentNamespace": "https://example.com/sbom/example-app-v1.0.0",
+  "creationInfo": {
+    "created": "2025-01-15T10:00:00Z",
+    "creators": ["Tool: syft-0.100.0"],
+    "licenseListVersion": "3.19"
+  },
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-RootPackage",
+      "name": "example-app",
+      "versionInfo": "1.0.0",
+      "downloadLocation": "NOASSERTION",
+      "licenseConcluded": "MIT",
+      "externalRefs": [
+        { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:golang/example.com/app@1.0.0" }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-lodash",
+      "name": "lodash",
+      "versionInfo": "4.17.21",
+      "downloadLocation": "https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz",
+      "licenseConcluded": "MIT",
+      "externalRefs": [
+        { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:npm/lodash@4.17.21" }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-express",
+      "name": "express",
+      "versionInfo": "4.18.2",
+      "downloadLocation": "https://registry.npmjs.org/express/-/express-4.18.2.tgz",
+      "licenseConcluded": "MIT",
+      "externalRefs": [
+        { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:npm/express@4.18.2" }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-debug",
+      "name": "debug",
+      "versionInfo": "2.6.9",
+      "downloadLocation": "https://registry.npmjs.org/debug/-/debug-2.6.9.tgz",
+      "licenseConcluded": "MIT",
+      "externalRefs": [
+        { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:npm/debug@2.6.9" }
+      ]
+    }
+  ],
+  "relationships": [
+    { "spdxElementId": "SPDXRef-DOCUMENT", "relationshipType": "DESCRIBES", "relatedSpdxElement": "SPDXRef-RootPackage" },
+    { "spdxElementId": "SPDXRef-RootPackage", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-lodash" },
+    { "spdxElementId": "SPDXRef-RootPackage", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-express" },
+    { "spdxElementId": "SPDXRef-Package-express", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-debug" }
+  ]
+}
+

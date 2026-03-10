@@ -1,0 +1,19 @@
+{{- if .Values.licenseExceptions.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-license-exceptions
+  labels:
+    app.kubernetes.io/name: seebom
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  license-exceptions.json: |-
+    {
+      "version": "1.0.0",
+      "lastUpdated": "2026-03-07",
+      "description": "License exceptions for SeeBOM. Edit this ConfigMap to add/remove exceptions.",
+      "blanketExceptions": [],
+      "exceptions": []
+    }
+{{- end }}
+

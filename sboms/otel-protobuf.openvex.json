@@ -1,0 +1,62 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://seebom.example.com/vex/otel-protobuf-2026-03-08",
+  "author": "SeeBOM Security Team",
+  "timestamp": "2026-03-08T10:00:00Z",
+  "version": 1,
+  "statements": [
+    {
+      "vulnerability": {
+        "@id": "https://pkg.go.dev/vuln/GO-2026-4394"
+      },
+      "products": [
+        {
+          "@id": "pkg:golang/go.opentelemetry.io/otel/sdk@v1.38.0"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "component_not_present",
+      "impact_statement": "The affected OTel SDK span processor is not used. We use a custom exporter."
+    },
+    {
+      "vulnerability": {
+        "@id": "https://pkg.go.dev/vuln/GO-2025-4135"
+      },
+      "products": [
+        {
+          "@id": "pkg:golang/google.golang.org/protobuf@v1.36.6"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "inline_mitigations_already_exist",
+      "impact_statement": "Protobuf unmarshalling is gated behind input validation and size limits in our API layer."
+    },
+    {
+      "vulnerability": {
+        "@id": "https://github.com/advisories/GHSA-f6x5-jh6r-wrfv"
+      },
+      "products": [
+        {
+          "@id": "pkg:golang/google.golang.org/protobuf@v1.36.6"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "inline_mitigations_already_exist",
+      "impact_statement": "Same mitigation as GO-2025-4135. Input validation prevents exploitation."
+    },
+    {
+      "vulnerability": {
+        "@id": "https://pkg.go.dev/vuln/GO-2025-4134"
+      },
+      "products": [
+        {
+          "@id": "pkg:golang/google.golang.org/protobuf@v1.36.6"
+        }
+      ],
+      "status": "affected",
+      "action_statement": "Upgrade to protobuf v1.37.0 planned for Q2 2026. Risk accepted for now.",
+      "impact_statement": "Potential denial of service via crafted protobuf messages. Low risk in internal services."
+    }
+  ]
+}
+

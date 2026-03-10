@@ -1,0 +1,167 @@
+package spdx
+
+import (
+	"strings"
+	"testing"
+)
+
+const testSPDXJSON = `{
+	"spdxVersion": "SPDX-2.3",
+	"name": "test-document",
+	"documentNamespace": "https://example.com/test",
+	"creationInfo": {
+		"created": "2025-01-15T10:00:00Z",
+		"creators": ["Tool: test-tool-1.0"]
+	},
+	"packages": [
+		{
+			"SPDXID": "SPDXRef-Package-A",
+			"name": "package-a",
+			"versionInfo": "1.0.0",
+			"licenseConcluded": "MIT",
+			"licenseDeclared": "MIT",
+			"externalRefs": [
+				{
+					"referenceCategory": "PACKAGE-MANAGER",
+					"referenceType": "purl",
+					"referenceLocator": "pkg:npm/package-a@1.0.0"
+				}
+			]
+		},
+		{
+			"SPDXID": "SPDXRef-Package-B",
+			"name": "package-b",
+			"versionInfo": "2.0.0",
+			"licenseConcluded": "Apache-2.0",
+			"licenseDeclared": "NOASSERTION",
+			"externalRefs": []
+		}
+	],
+	"relationships": [
+		{
+			"spdxElementId": "SPDXRef-Package-A",
+			"relationshipType": "DEPENDS_ON",
+			"relatedSpdxElement": "SPDXRef-Package-B"
+		}
+	]
+}`
+
+func TestParse(t *testing.T) {
+	result, err := Parse(strings.NewReader(testSPDXJSON), "test.spdx.json", "abc123")
+	if err != nil {
+		t.Fatalf("Parse() returned error: %v", err)
+	}
+
+	// Verify SBOM metadata.
+	if result.SBOM.SPDXVersion != "SPDX-2.3" {
+		t.Errorf("expected SPDX-2.3, got %s", result.SBOM.SPDXVersion)
+	}
+	if result.SBOM.DocumentName != "test-document" {
+		t.Errorf("expected test-document, got %s", result.SBOM.DocumentName)
+	}
+	if result.SBOM.SHA256Hash != "abc123" {
+		t.Errorf("expected abc123, got %s", result.SBOM.SHA256Hash)
+	}
+
+	// Verify packages.
+	if len(result.Packages.PackageNames) != 2 {
+		t.Fatalf("expected 2 packages, got %d", len(result.Packages.PackageNames))
+	}
+	if result.Packages.PackageNames[0] != "package-a" {
+		t.Errorf("expected package-a, got %s", result.Packages.PackageNames[0])
+	}
+	if result.Packages.PackagePURLs[0] != "pkg:npm/package-a@1.0.0" {
+		t.Errorf("expected purl, got %s", result.Packages.PackagePURLs[0])
+	}
+
+	// Verify license fallback (NOASSERTION → concluded).
+	if result.Packages.PackageLicenses[1] != "Apache-2.0" {
+		t.Errorf("expected Apache-2.0 (fallback), got %s", result.Packages.PackageLicenses[1])
+	}
+
+	// Verify relationships.
+	if len(result.Packages.RelSourceIndices) != 1 {
+		t.Fatalf("expected 1 relationship, got %d", len(result.Packages.RelSourceIndices))
+	}
+	if result.Packages.RelSourceIndices[0] != 0 || result.Packages.RelTargetIndices[0] != 1 {
+		t.Errorf("expected relationship 0→1, got %d→%d",
+			result.Packages.RelSourceIndices[0], result.Packages.RelTargetIndices[0])
+	}
+	if result.Packages.RelTypes[0] != "DEPENDS_ON" {
+		t.Errorf("expected DEPENDS_ON, got %s", result.Packages.RelTypes[0])
+	}
+}
+
+func TestParse_InvalidJSON(t *testing.T) {
+	_, err := Parse(strings.NewReader(`{invalid`), "bad.json", "hash")
+	if err == nil {
+		t.Error("expected error for invalid JSON, got nil")
+	}
+}
+
+func TestParse_EmptyPackages(t *testing.T) {
+	doc := `{
+		"spdxVersion": "SPDX-2.3",
+		"name": "empty-sbom",
+		"documentNamespace": "https://example.com/empty",
+		"creationInfo": {"created": "2025-01-01T00:00:00Z", "creators": ["Tool: test"]},
+		"packages": [],
+		"relationships": []
+	}`
+
+	result, err := Parse(strings.NewReader(doc), "empty.spdx.json", "hash1")
+	if err != nil {
+		t.Fatalf("Parse() error: %v", err)
+	}
+	if result.SBOM.DocumentName != "empty-sbom" {
+		t.Errorf("expected empty-sbom, got %s", result.SBOM.DocumentName)
+	}
+	if len(result.Packages.PackageNames) != 0 {
+		t.Errorf("expected 0 packages, got %d", len(result.Packages.PackageNames))
+	}
+}
+
+func TestParse_DeterministicSBOMID(t *testing.T) {
+	// Same SHA256 hash should produce the same SBOM ID.
+	r1, _ := Parse(strings.NewReader(testSPDXJSON), "a.json", "same-hash")
+	r2, _ := Parse(strings.NewReader(testSPDXJSON), "b.json", "same-hash")
+
+	if r1.SBOM.SBOMID != r2.SBOM.SBOMID {
+		t.Errorf("expected same SBOM ID for same hash, got %s vs %s",
+			r1.SBOM.SBOMID, r2.SBOM.SBOMID)
+	}
+
+	// Different hash → different ID.
+	r3, _ := Parse(strings.NewReader(testSPDXJSON), "c.json", "different-hash")
+	if r1.SBOM.SBOMID == r3.SBOM.SBOMID {
+		t.Error("expected different SBOM ID for different hash")
+	}
+}
+
+func TestParse_LicenseFallback(t *testing.T) {
+	// When licenseDeclared is NOASSERTION, should fallback to licenseConcluded.
+	doc := `{
+		"spdxVersion": "SPDX-2.3",
+		"name": "license-test",
+		"documentNamespace": "https://example.com/lic-test",
+		"creationInfo": {"created": "2025-01-01T00:00:00Z", "creators": ["Tool: test"]},
+		"packages": [
+			{"SPDXID": "SPDXRef-A", "name": "pkg", "versionInfo": "1.0",
+			 "licenseConcluded": "MIT", "licenseDeclared": "NOASSERTION", "externalRefs": []},
+			{"SPDXID": "SPDXRef-B", "name": "pkg2", "versionInfo": "1.0",
+			 "licenseConcluded": "NOASSERTION", "licenseDeclared": "NOASSERTION", "externalRefs": []}
+		],
+		"relationships": []
+	}`
+
+	result, err := Parse(strings.NewReader(doc), "lic.json", "h")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Packages.PackageLicenses[0] != "MIT" {
+		t.Errorf("expected MIT fallback, got %s", result.Packages.PackageLicenses[0])
+	}
+	if result.Packages.PackageLicenses[1] != "NOASSERTION" {
+		t.Errorf("expected NOASSERTION when both are NOASSERTION, got %s", result.Packages.PackageLicenses[1])
+	}
+}

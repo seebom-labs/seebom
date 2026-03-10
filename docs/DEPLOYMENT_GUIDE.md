@@ -1,0 +1,295 @@
+# SeeBOM – Kubernetes Deployment Guide
+
+> **Updated:** 2026-03-08
+
+## Prerequisites
+
+- Kubernetes cluster (1.27+)
+- [ClickHouse Operator](https://github.com/Altinity/clickhouse-operator) installed
+- Helm 3.x
+- Container images pushed to a registry (e.g. `ghcr.io/your-org/seebom/*`)
+
+---
+
+## 1. SBOMs – Getting Data Into the Cluster
+
+SBOMs are loaded from a Git repository using **git-sync**. The Helm chart includes a git-sync initContainer that clones the repo before ingestion starts.
+
+### Option A: Public SBOM Repository (default)
+
+```yaml
+# values-production.yaml
+gitSync:
+  enabled: true
+  repo: "https://github.com/your-org/sbom-repo.git"
+  branch: main
+```
+
+### Option B: Private SBOM Repository (SSH key)
+
+Create a secret with your deploy key:
+
+```bash
+kubectl create secret generic git-sync-credentials \
+  --from-file=ssh-key=/path/to/id_rsa \
+  --from-literal=GIT_SYNC_SSH_KEY_FILE=/etc/git-secret/ssh-key
+```
+
+```yaml
+# values-production.yaml
+gitSync:
+  enabled: true
+  repo: "git@github.com:your-org/sbom-repo.git"
+  branch: main
+  secretName: git-sync-credentials
+```
+
+### Option C: Pre-populated PVC (no git-sync)
+
+If you populate the PVC yourself (e.g. via a CI pipeline):
+
+```yaml
+gitSync:
+  enabled: false
+sbomSource:
+  pvcName: my-preloaded-sbom-pvc
+```
+
+> **Note:** VEX files (`*.openvex.json`, `*.vex.json`) should be placed alongside SBOM files in the same directory. They are never truncated by `SBOM_LIMIT`.
+
+---
+
+## 2. License Exceptions – Whitelisting Known Violations
+
+License exceptions suppress specific license violations. They are stored in a **ConfigMap** that is mounted read-only into the API Gateway and Workers.
+
+### Edit the default ConfigMap
+
+After `helm install`, edit the ConfigMap directly:
+
+```bash
+kubectl edit configmap seebom-license-exceptions
+```
+
+The JSON format follows the [CNCF exceptions format](https://github.com/cncf/foundation/blob/main/license-exceptions/exceptions.json):
+
+```json
+{
+  "version": "1.0.0",
+  "lastUpdated": "2026-03-07",
+  "blanketExceptions": [
+    {
+      "id": "blanket-mpl-2.0",
+      "license": "MPL-2.0",
+      "status": "approved",
+      "approvedDate": "2026-03-07",
+      "comment": "MPL-2.0 is file-level copyleft, acceptable for unmodified deps."
+    }
+  ],
+  "exceptions": [
+    {
+      "id": "exc-001",
+      "package": "github.com/hashicorp/golang-lru",
+      "license": "MPL-2.0",
+      "status": "approved",
+      "approvedDate": "2026-03-07",
+      "comment": "Widely used LRU cache, unmodified."
+    }
+  ]
+}
+```
+
+### Apply changes
+
+After editing, restart the API Gateway to pick up changes:
+
+```bash
+kubectl rollout restart deployment seebom-api-gateway
+```
+
+> **Note:** Violations are filtered at query time, so no re-ingestion is needed.
+
+---
+
+## 3. License Policy – Defining Permissive vs. Copyleft
+
+The license policy defines which SPDX IDs are classified as **permissive**, **copyleft**, or **unknown**. Any license not listed falls into `unknown`.
+
+### Edit the default ConfigMap
+
+```bash
+kubectl edit configmap seebom-license-policy
+```
+
+The format:
+
+```json
+{
+  "permissive": [
+    "MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause",
+    "ISC", "Unlicense", "0BSD", "CC0-1.0", "Zlib"
+  ],
+  "copyleft": [
+    "GPL-2.0-only", "GPL-3.0-only", "AGPL-3.0-only",
+    "LGPL-2.1-only", "MPL-2.0", "EPL-2.0"
+  ]
+}
+```
+
+### Apply changes
+
+After editing, restart **both** the API Gateway and Workers:
+
+```bash
+kubectl rollout restart deployment seebom-api-gateway seebom-parsing-worker
+```
+
+> **Note:** Policy changes affect new ingestions. To reclassify existing data,
+> trigger a full re-scan (truncate tables + re-ingest).
+
+---
+
+## 4. Custom Theme – Rebranding the UI
+
+The entire UI color scheme is defined via 60+ CSS Custom Properties and can be overridden **without rebuilding Angular**.
+
+### Enable the theme ConfigMap
+
+```yaml
+# values-production.yaml
+ui:
+  customTheme:
+    enabled: true
+```
+
+### Apply a custom theme
+
+```bash
+kubectl create configmap seebom-custom-theme \
+  --from-file=custom-theme.css=./my-theme.css \
+  --dry-run=client -o yaml | kubectl apply -f -
+kubectl rollout restart deployment seebom-ui
+```
+
+### Example theme file
+
+```css
+/* my-theme.css – override any CSS variable */
+:root {
+  --accent: #0066cc;
+  --nav-bg: #002244;
+  --nav-brand: #ff9900;
+  --severity-critical: #ff4444;
+  --license-permissive: #22c55e;
+}
+```
+
+See `ui/src/assets/custom-theme.example.css` for all available variables.
+
+> **Note:** The UI also includes a built-in **Dark Mode toggle** (top right of navbar). It persists the user's preference in `localStorage` and respects `prefers-color-scheme`.
+
+---
+
+## 5. Full Deployment Example
+
+```bash
+# 1. Install the Helm chart
+helm install seebom ./deploy/helm/seebom \
+  -f values-production.yaml \
+  --set image.registry=ghcr.io \
+  --set image.repository=your-org/seebom \
+  --set image.tag=0.1.0 \
+  --set gitSync.repo=https://github.com/your-org/sbom-repo.git \
+  --set parsingWorker.replicas=10 \
+  --set parsingWorker.skipOSV=false \
+  --set ui.customTheme.enabled=true
+
+# 2. Override license exceptions from a local file
+kubectl create configmap seebom-license-exceptions \
+  --from-file=license-exceptions.json=./my-exceptions.json \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# 3. Override license policy from a local file
+kubectl create configmap seebom-license-policy \
+  --from-file=license-policy.json=./my-policy.json \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# 4. Apply a custom theme
+kubectl create configmap seebom-custom-theme \
+  --from-file=custom-theme.css=./my-theme.css \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# 5. Restart to pick up new configs
+kubectl rollout restart deployment seebom-api-gateway seebom-parsing-worker seebom-ui
+
+# 6. Trigger initial ingestion manually
+kubectl create job --from=cronjob/seebom-ingestion-watcher seebom-initial-ingest
+```
+
+---
+
+## 6. Verifying the Deployment
+
+```bash
+# Check all pods are running
+kubectl get pods -l app.kubernetes.io/name=seebom
+
+# Check ingestion progress
+kubectl exec -it $(kubectl get pod -l app.kubernetes.io/component=api-gateway -o name | head -1) \
+  -- wget -qO- http://localhost:8080/api/v1/stats/dashboard
+
+# View loaded policy
+kubectl exec -it $(kubectl get pod -l app.kubernetes.io/component=api-gateway -o name | head -1) \
+  -- wget -qO- http://localhost:8080/api/v1/license-policy
+
+# View active exceptions
+kubectl exec -it $(kubectl get pod -l app.kubernetes.io/component=api-gateway -o name | head -1) \
+  -- wget -qO- http://localhost:8080/api/v1/license-exceptions
+```
+
+---
+
+## 7. Local Development
+
+Copy `.env.example` to `.env` and adjust:
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SBOM_SOURCE_DIR` | `./sboms` | Path to your SBOM files (can point to an external repo checkout) |
+| `SBOM_LIMIT` | `0` | Max SBOMs to enqueue per watcher run. `0` = unlimited. VEX files are never limited. |
+| `WORKER_REPLICAS` | `1` | Number of parallel parsing worker containers |
+| `WORKER_BATCH_SIZE` | `50` | Jobs claimed per polling cycle per worker |
+| `SKIP_OSV` | `false` | Skip OSV vulnerability API calls. Set `true` for fast initial bulk load. |
+| `CUSTOM_THEME` | (example file) | Path to a custom CSS theme file for the UI |
+
+### Useful Make targets
+
+| Command | Description |
+|---------|-------------|
+| `make dev` | Start full stack via Docker Compose |
+| `make dev-down` | Stop all containers |
+| `make dev-restart` | Restart with new `.env` values (keeps data) |
+| `make dev-reset` | Destroy data volumes and restart fresh |
+| `make re-ingest` | Re-trigger the Ingestion Watcher (scans for new files) |
+| `make re-scan` | Wipe all data and re-process everything (e.g. after enabling OSV) |
+| `make dev-status` | Show container status + ingestion progress |
+| `make ch-shell` | Open a ClickHouse CLI |
+
+---
+
+## Summary
+
+| What | Where | How to Change |
+|---|---|---|
+| **SBOMs** | Git repo → git-sync → emptyDir volume | Push to Git, CronJob re-syncs every 6h |
+| **VEX files** | Same directory as SBOMs | Place `*.openvex.json` or `*.vex.json` alongside SBOMs |
+| **License Exceptions** | `seebom-license-exceptions` ConfigMap | `kubectl edit configmap` → restart API |
+| **License Policy** | `seebom-license-policy` ConfigMap | `kubectl edit configmap` → restart API + Workers |
+| **Custom Theme** | `seebom-custom-theme` ConfigMap | `kubectl create configmap` → restart UI |
+| **Dark Mode** | Built-in toggle (navbar) | User preference, stored in browser localStorage |
+| **ClickHouse password** | `seebom-secret` Secret | `kubectl edit secret` |
+

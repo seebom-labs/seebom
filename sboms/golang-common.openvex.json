@@ -1,0 +1,79 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://seebom.example.com/vex/golang-common-2026-03-08",
+  "author": "SeeBOM Security Team",
+  "timestamp": "2026-03-08T10:00:00Z",
+  "version": 1,
+  "statements": [
+    {
+      "vulnerability": {
+        "@id": "https://pkg.go.dev/vuln/GO-2025-4188"
+      },
+      "products": [
+        {
+          "@id": "pkg:golang/github.com/sirupsen/logrus@v1.9.0"
+        },
+        {
+          "@id": "pkg:golang/github.com/sirupsen/logrus@v1.8.1"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "The vulnerable logging path is never reached in our usage. We only use structured logging with no user-controlled format strings."
+    },
+    {
+      "vulnerability": {
+        "@id": "https://github.com/advisories/GHSA-4f99-4q7p-p3gh"
+      },
+      "products": [
+        {
+          "@id": "pkg:golang/github.com/sirupsen/logrus@v1.9.0"
+        },
+        {
+          "@id": "pkg:golang/github.com/sirupsen/logrus@v1.8.1"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_in_execute_path",
+      "impact_statement": "Same as GO-2025-4188. Logrus format string vulnerability is not reachable."
+    },
+    {
+      "vulnerability": {
+        "@id": "https://pkg.go.dev/vuln/GO-2022-0635"
+      },
+      "products": [
+        {
+          "@id": "pkg:golang/github.com/aws/aws-sdk-go@v1.55.7"
+        }
+      ],
+      "status": "affected",
+      "action_statement": "Upgrade to aws-sdk-go v1.56.0 or later. Tracked in JIRA-4521.",
+      "impact_statement": "AWS SDK credential logging may expose secrets in debug-level logs."
+    },
+    {
+      "vulnerability": {
+        "@id": "https://pkg.go.dev/vuln/GO-2022-0646"
+      },
+      "products": [
+        {
+          "@id": "pkg:golang/github.com/aws/aws-sdk-go@v1.55.7"
+        }
+      ],
+      "status": "under_investigation",
+      "impact_statement": "Assessing whether our S3 usage is affected by this AWS SDK path traversal issue."
+    },
+    {
+      "vulnerability": {
+        "@id": "https://github.com/advisories/GHSA-37cx-329c-33x3"
+      },
+      "products": [
+        {
+          "@id": "pkg:golang/github.com/go-git/go-git/v5@v5.14.0"
+        }
+      ],
+      "status": "fixed",
+      "impact_statement": "Fixed by upgrading go-git to v5.15.0 in the February 2026 dependency update."
+    }
+  ]
+}
+

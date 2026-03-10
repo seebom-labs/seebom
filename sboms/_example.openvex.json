@@ -1,0 +1,20 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://example.com/vex/2025-001",
+  "author": "SeeBOM Example",
+  "role": "vendor",
+  "timestamp": "2025-06-15T10:00:00Z",
+  "version": 1,
+  "statements": [
+    {
+      "vulnerability": { "name": "CVE-2020-28500" },
+      "products": [
+        { "@id": "pkg:npm/lodash@4.17.21" }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "The regex DoS in lodash.trim is not reachable in our usage."
+    }
+  ]
+}
+

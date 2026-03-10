@@ -1,0 +1,84 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "backend-service",
+  "documentNamespace": "https://example.com/sbom/backend-service-v2.1.0",
+  "creationInfo": {
+    "created": "2025-03-20T14:30:00Z",
+    "creators": ["Tool: syft-0.100.0"],
+    "licenseListVersion": "3.19"
+  },
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-RootPackage",
+      "name": "backend-service",
+      "versionInfo": "2.1.0",
+      "downloadLocation": "NOASSERTION",
+      "licenseConcluded": "Apache-2.0",
+      "externalRefs": [
+        { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:golang/example.com/backend@2.1.0" }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-readline",
+      "name": "readline",
+      "versionInfo": "8.2",
+      "downloadLocation": "https://ftp.gnu.org/gnu/readline/readline-8.2.tar.gz",
+      "licenseConcluded": "GPL-3.0-only",
+      "externalRefs": [
+        { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:generic/readline@8.2" }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-libgmp",
+      "name": "libgmp",
+      "versionInfo": "6.3.0",
+      "downloadLocation": "https://gmplib.org/download/gmp/gmp-6.3.0.tar.xz",
+      "licenseConcluded": "LGPL-3.0-or-later",
+      "externalRefs": [
+        { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:generic/libgmp@6.3.0" }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-mysterylib",
+      "name": "mystery-lib",
+      "versionInfo": "0.4.1",
+      "downloadLocation": "https://example.com/mystery-lib-0.4.1.tar.gz",
+      "licenseConcluded": "NOASSERTION",
+      "externalRefs": [
+        { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:generic/mystery-lib@0.4.1" }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-customcode",
+      "name": "custom-codec",
+      "versionInfo": "1.0.0",
+      "downloadLocation": "https://example.com/custom-codec-1.0.0.tar.gz",
+      "licenseConcluded": "Beerware",
+      "externalRefs": [
+        { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:generic/custom-codec@1.0.0" }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-lodash",
+      "name": "lodash",
+      "versionInfo": "4.17.21",
+      "downloadLocation": "https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz",
+      "licenseConcluded": "MIT",
+      "externalRefs": [
+        { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:npm/lodash@4.17.21" }
+      ]
+    }
+  ],
+  "relationships": [
+    { "spdxElementId": "SPDXRef-DOCUMENT", "relationshipType": "DESCRIBES", "relatedSpdxElement": "SPDXRef-RootPackage" },
+    { "spdxElementId": "SPDXRef-RootPackage", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-readline" },
+    { "spdxElementId": "SPDXRef-RootPackage", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-libgmp" },
+    { "spdxElementId": "SPDXRef-RootPackage", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-mysterylib" },
+    { "spdxElementId": "SPDXRef-RootPackage", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-customcode" },
+    { "spdxElementId": "SPDXRef-RootPackage", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-lodash" },
+    { "spdxElementId": "SPDXRef-Package-readline", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Package-libgmp" }
+  ]
+}
+

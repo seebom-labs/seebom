@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  labels:
+    app.kubernetes.io/name: seebom
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  CLICKHOUSE_HOST: {{ .Values.clickhouse.host | quote }}
+  CLICKHOUSE_PORT: {{ .Values.clickhouse.port | quote }}
+  CLICKHOUSE_DATABASE: {{ .Values.clickhouse.database | quote }}
+  CLICKHOUSE_USER: {{ .Values.clickhouse.user | quote }}
+  SBOM_DIR: {{ .Values.sbomSource.mountPath | quote }}
+  API_PORT: {{ .Values.apiGateway.port | quote }}
+  WORKER_BATCH_SIZE: {{ .Values.parsingWorker.batchSize | quote }}
+  SKIP_OSV: {{ .Values.parsingWorker.skipOSV | quote }}
+  SBOM_LIMIT: {{ .Values.ingestionWatcher.sbomLimit | quote }}
+  EXCEPTIONS_FILE: {{ .Values.licenseExceptions.mountPath | quote }}
+  LICENSE_POLICY_FILE: {{ .Values.licensePolicy.mountPath | quote }}
+

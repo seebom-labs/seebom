@@ -1,0 +1,15 @@
+apiVersion: v2
+name: seebom
+description: SeeBOM Labs - Kubernetes-native SBOM visualization and governance platform
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - sbom
+  - spdx
+  - vulnerability
+  - license
+  - clickhouse
+maintainers:
+  - name: mfahlandt
+

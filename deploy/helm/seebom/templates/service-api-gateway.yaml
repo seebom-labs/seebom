@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-api-gateway
+  labels:
+    app.kubernetes.io/name: seebom
+    app.kubernetes.io/component: api-gateway
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  type: {{ .Values.apiGateway.service.type }}
+  ports:
+    - port: {{ .Values.apiGateway.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: seebom
+    app.kubernetes.io/component: api-gateway
+

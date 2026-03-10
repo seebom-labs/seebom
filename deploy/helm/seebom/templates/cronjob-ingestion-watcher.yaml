@@ -1,0 +1,63 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-ingestion-watcher
+  labels:
+    app.kubernetes.io/name: seebom
+    app.kubernetes.io/component: ingestion-watcher
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  schedule: {{ .Values.ingestionWatcher.schedule | quote }}
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: seebom
+            app.kubernetes.io/component: ingestion-watcher
+        spec:
+          restartPolicy: OnFailure
+          {{- if .Values.gitSync.enabled }}
+          initContainers:
+            - name: git-sync
+              image: {{ .Values.gitSync.image }}
+              args:
+                - --repo={{ .Values.gitSync.repo }}
+                - --ref={{ .Values.gitSync.branch }}
+                - --depth={{ .Values.gitSync.depth }}
+                - --root={{ .Values.gitSync.root }}
+                - --one-time
+              volumeMounts:
+                - name: sbom-data
+                  mountPath: {{ .Values.gitSync.root }}
+              {{- if .Values.gitSync.secretName }}
+              envFrom:
+                - secretRef:
+                    name: {{ .Values.gitSync.secretName }}
+              {{- end }}
+          {{- end }}
+          containers:
+            - name: ingestion-watcher
+              image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}/ingestion-watcher:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              envFrom:
+                - configMapRef:
+                    name: {{ .Release.Name }}-config
+                - secretRef:
+                    name: {{ .Release.Name }}-secret
+              resources:
+                {{- toYaml .Values.ingestionWatcher.resources | nindent 16 }}
+              volumeMounts:
+                - name: sbom-data
+                  mountPath: {{ .Values.sbomSource.mountPath }}
+                  readOnly: true
+          volumes:
+            - name: sbom-data
+              {{- if .Values.gitSync.enabled }}
+              emptyDir: {}
+              {{- else }}
+              persistentVolumeClaim:
+                claimName: {{ .Values.sbomSource.pvcName }}
+              {{- end }}
+

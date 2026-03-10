@@ -1,0 +1,48 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2026-03-07",
+  "description": "License exceptions for SeeBOM governance. Packages listed here are exempt from license violation reporting.",
+  "blanketExceptions": [
+    {
+      "id": "blanket-mpl-2.0",
+      "license": "MPL-2.0",
+      "status": "approved",
+      "approvedDate": "2026-03-07",
+      "scope": "file-level copyleft, dynamically linked, unmodified",
+      "comment": "MPL-2.0 is file-level copyleft and generally acceptable for infrastructure dependencies when unmodified."
+    }
+  ],
+  "exceptions": [
+    {
+      "id": "exc-2026-03-07-001",
+      "package": "github.com/hashicorp/golang-lru",
+      "license": "MPL-2.0",
+      "project": "All Projects",
+      "status": "approved",
+      "approvedDate": "2026-03-07",
+      "scope": "vendored dependency, dynamically linked, unmodified",
+      "comment": "Widely used LRU cache library. MPL-2.0 is file-level copyleft, acceptable for unmodified use."
+    },
+    {
+      "id": "exc-2026-03-07-002",
+      "package": "github.com/hashicorp/go-multierror",
+      "license": "MPL-2.0",
+      "project": "All Projects",
+      "status": "approved",
+      "approvedDate": "2026-03-07",
+      "scope": "vendored dependency, unmodified",
+      "comment": "Error aggregation utility. Unmodified transitive dependency."
+    },
+    {
+      "id": "exc-2026-03-07-003",
+      "package": "go.uber.org/mock",
+      "license": "Apache-2.0",
+      "project": "Antrea",
+      "status": "approved",
+      "approvedDate": "2026-03-07",
+      "scope": "test-only dependency",
+      "comment": "Mock framework used only in tests, not shipped in production binaries."
+    }
+  ]
+}
+

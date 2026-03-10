@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-api-gateway
+  labels:
+    app.kubernetes.io/name: seebom
+    app.kubernetes.io/component: api-gateway
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.apiGateway.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seebom
+      app.kubernetes.io/component: api-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: seebom
+        app.kubernetes.io/component: api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}/api-gateway:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.apiGateway.port }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ .Release.Name }}-config
+            - secretRef:
+                name: {{ .Release.Name }}-secret
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.apiGateway.resources | nindent 12 }}
+          volumeMounts:
+            {{- if .Values.licenseExceptions.enabled }}
+            - name: license-exceptions
+              mountPath: {{ .Values.licenseExceptions.mountPath }}
+              subPath: license-exceptions.json
+              readOnly: true
+            {{- end }}
+            {{- if .Values.licensePolicy.enabled }}
+            - name: license-policy
+              mountPath: {{ .Values.licensePolicy.mountPath }}
+              subPath: license-policy.json
+              readOnly: true
+            {{- end }}
+      volumes:
+        {{- if .Values.licenseExceptions.enabled }}
+        - name: license-exceptions
+          configMap:
+            name: {{ .Release.Name }}-license-exceptions
+        {{- end }}
+        {{- if .Values.licensePolicy.enabled }}
+        - name: license-policy
+          configMap:
+            name: {{ .Release.Name }}-license-policy
+        {{- end }}
+

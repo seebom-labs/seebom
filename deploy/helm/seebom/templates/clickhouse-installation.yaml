@@ -1,0 +1,19 @@
+# ClickHouse Installation CR (requires ClickHouse Operator)
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: {{ .Release.Name }}-clickhouse
+  labels:
+    app.kubernetes.io/name: seebom
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  configuration:
+    clusters:
+      - name: {{ .Values.clickhouse.cluster.name }}
+        layout:
+          shardsCount: {{ .Values.clickhouse.cluster.shardsCount }}
+          replicasCount: {{ .Values.clickhouse.cluster.replicasCount }}
+    users:
+      {{ .Values.clickhouse.user }}/password: {{ .Values.clickhouse.password | quote }}
+      {{ .Values.clickhouse.user }}/networks/ip: "::/0"
+

@@ -1,0 +1,76 @@
+name: Feature Request
+description: Suggest a new feature or enhancement for SeeBOM
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Please describe what you'd like and why.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: Is your feature request related to a problem? Describe it.
+      placeholder: "I'm always frustrated when..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Describe any alternative solutions or features you've considered.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of SeeBOM would this affect?
+      multiple: true
+      options:
+        - UI / Dashboard
+        - API Gateway
+        - Parsing Worker
+        - Ingestion Watcher
+        - ClickHouse / Database
+        - Helm Chart / Deployment
+        - Documentation
+        - New Component
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      description: How large is this change?
+      options:
+        - Small – Single component, few files
+        - Medium – Multiple components, new endpoint or view
+        - Large – Architecture change, new subsystem
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Add any mockups, screenshots, examples, or references.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: I have searched existing issues and this has not been requested before.
+          required: true
+        - label: This feature is within the [project scope](GOVERNANCE.md#project-scope).
+

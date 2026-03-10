@@ -1,0 +1,15 @@
+{{- if .Values.ui.customTheme.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-custom-theme
+  labels:
+    app.kubernetes.io/name: seebom
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  custom-theme.css: |-
+    /* SeeBOM Custom Theme – edit this ConfigMap to rebrand the UI */
+    /* Run: kubectl edit configmap {{ .Release.Name }}-custom-theme */
+    /* Then: kubectl rollout restart deployment {{ .Release.Name }}-ui */
+{{- end }}
+

@@ -1,0 +1,48 @@
+name: Documentation Improvement
+description: Report missing, incorrect, or unclear documentation
+title: "[Docs]: "
+labels: ["documentation", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Help us improve the docs! Tell us what's missing or unclear.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What needs improvement?
+      description: Describe what documentation is missing, incorrect, or unclear.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: doc-type
+    attributes:
+      label: Documentation Area
+      options:
+        - README
+        - Architecture Plan
+        - Deployment Guide
+        - Release Guide
+        - Testing Guide
+        - Governance / Contributing
+        - Inline code comments
+        - API documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested Improvement
+      description: How should the documentation be improved?
+
+  - type: checkboxes
+    id: willing
+    attributes:
+      label: Contribution
+      options:
+        - label: I am willing to submit a PR for this improvement.
+

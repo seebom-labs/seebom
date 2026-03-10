@@ -1,0 +1,119 @@
+# SeeBOM Helm values
+
+# Container image defaults
+image:
+  registry: ghcr.io
+  repository: seebom-labs/seebom
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+# ClickHouse (provisioned via ClickHouse Operator)
+clickhouse:
+  host: chi-seebom-cluster-0-0
+  port: 9000
+  database: seebom
+  user: default
+  password: ""
+  cluster:
+    name: seebom-cluster
+    shardsCount: 1
+    replicasCount: 1
+
+# SBOM source (PVC populated by git-sync sidecar)
+sbomSource:
+  pvcName: seebom-sbom-data
+  mountPath: /data/sboms
+
+# git-sync: automatically pulls SBOMs from a Git repository into the PVC.
+# Runs as an initContainer on the watcher + sidecar on workers.
+gitSync:
+  enabled: true
+  image: registry.k8s.io/git-sync/git-sync:v4.4.0
+  repo: "https://github.com/your-org/sbom-repo.git"
+  branch: main
+  depth: 1          # shallow clone
+  period: "6h"      # re-sync interval (sidecar mode)
+  root: /data/sboms
+  # For private repos, mount a Secret with SSH key or token:
+  # secretName: git-sync-credentials
+
+# License exceptions (mounted as ConfigMap, read-only)
+licenseExceptions:
+  enabled: true
+  mountPath: /data/config/license-exceptions.json
+
+# License policy – defines permissive/copyleft classification (ConfigMap, read-only)
+licensePolicy:
+  enabled: true
+  mountPath: /data/config/license-policy.json
+
+# Ingestion Watcher (CronJob)
+ingestionWatcher:
+  schedule: "0 */6 * * *"  # Every 6 hours
+  sbomLimit: 0              # 0 = unlimited
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Parsing Worker (Deployment)
+parsingWorker:
+  replicas: 5
+  batchSize: 50
+  skipOSV: false            # Set to true for fast initial bulk load
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+# API Gateway (Deployment)
+apiGateway:
+  replicas: 2
+  port: 8080
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# UI (Deployment)
+ui:
+  replicas: 1
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  # Custom CSS theme – mount a custom-theme.css to override colors.
+  # Edit the ConfigMap to rebrand the UI without rebuilding.
+  customTheme:
+    enabled: false
+
+# CVE Refresher (CronJob) – checks all known PURLs for newly disclosed CVEs.
+cveRefresher:
+  enabled: true
+  schedule: "0 2 * * *"    # Daily at 2 AM
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
