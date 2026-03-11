@@ -26,6 +26,7 @@ func main() {
 	defer chClient.Close()
 
 	exceptionsPath := cfg.ExceptionsFile
+	sbomDirExceptionsPath := cfg.SBOMDir + "/license-exceptions.json"
 
 	// Load license policy (permissive/copyleft classification).
 	if perm, copy, err := license.LoadPolicy(cfg.LicensePolicyFile); err == nil {
@@ -160,11 +161,8 @@ func main() {
 
 	// Projects with license violations (filtered by exceptions).
 	mux.HandleFunc("GET /api/v1/projects/license-violations", func(w http.ResponseWriter, r *http.Request) {
-		// Load current exceptions for filtering.
-		var excIdx *license.ExceptionIndex
-		if idx, err := license.LoadExceptions(exceptionsPath); err == nil {
-			excIdx = idx
-		}
+		// Load current exceptions for filtering (try config path, then SBOM dir).
+		excIdx, _ := license.LoadExceptionsWithFallback(exceptionsPath, sbomDirExceptionsPath)
 		violations, err := chClient.QueryProjectsWithLicenseViolations(r.Context(), excIdx)
 		if err != nil {
 			log.Printf("ERROR: license violations: %v", err)
@@ -216,10 +214,10 @@ func main() {
 		writeJSON(w, http.StatusOK, resp)
 	})
 
-	// ── License Exceptions (read-only from config file) ────────────────
+	// ── License Exceptions (read-only from config file or SBOM dir) ────
 	mux.HandleFunc("GET /api/v1/license-exceptions", func(w http.ResponseWriter, r *http.Request) {
-		idx, err := license.LoadExceptions(exceptionsPath)
-		if err != nil {
+		idx, err := license.LoadExceptionsWithFallback(exceptionsPath, sbomDirExceptionsPath)
+		if err != nil || idx == nil {
 			writeJSON(w, http.StatusOK, license.ExceptionsFile{
 				Version:           "1.0.0",
 				BlanketExceptions: []license.BlanketException{},

@@ -28,6 +28,9 @@ spec:
                 - --depth={{ .Values.gitSync.depth }}
                 - --root={{ .Values.gitSync.root }}
                 - --one-time
+                {{- if .Values.gitSync.timeout }}
+                - --sync-timeout={{ .Values.gitSync.timeout }}s
+                {{- end }}
               volumeMounts:
                 - name: sbom-data
                   mountPath: {{ .Values.gitSync.root }}

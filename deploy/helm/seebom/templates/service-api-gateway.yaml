@@ -13,6 +13,9 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
+      {{- if and (eq .Values.apiGateway.service.type "NodePort") .Values.apiGateway.service.nodePort }}
+      nodePort: {{ .Values.apiGateway.service.nodePort }}
+      {{- end }}
   selector:
     app.kubernetes.io/name: seebom
     app.kubernetes.io/component: api-gateway

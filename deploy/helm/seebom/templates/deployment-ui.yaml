@@ -40,17 +40,24 @@ spec:
             periodSeconds: 5
           resources:
             {{- toYaml .Values.ui.resources | nindent 12 }}
-          {{- if .Values.ui.customTheme.enabled }}
           volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/seebom.conf
+              subPath: seebom.conf
+              readOnly: true
+            {{- if .Values.ui.customTheme.enabled }}
             - name: custom-theme
               mountPath: /usr/share/nginx/html/custom-theme.css
               subPath: custom-theme.css
               readOnly: true
-          {{- end }}
-      {{- if .Values.ui.customTheme.enabled }}
+            {{- end }}
       volumes:
+        - name: nginx-config
+          configMap:
+            name: {{ .Release.Name }}-nginx-config
+        {{- if .Values.ui.customTheme.enabled }}
         - name: custom-theme
           configMap:
             name: {{ .Release.Name }}-custom-theme
-      {{- end }}
+        {{- end }}
 

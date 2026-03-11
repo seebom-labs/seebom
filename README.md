@@ -130,7 +130,24 @@ docker compose up -d --force-recreate api-gateway parsing-worker
 
 See [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md) for Kubernetes deployment instructions.
 
-### Option B: Local Development (Hot Reload)
+### Option B: Local Kubernetes (Kind)
+
+Deploy the full stack to a local [Kind](https://kind.sigs.k8s.io/) cluster, including ClickHouse Operator, CNCF SBOM ingestion, and the Angular UI:
+
+```bash
+# 1. Copy secrets template and fill in your values
+cp examples/kind/secrets.env.example local/secrets.env
+vi local/secrets.env
+
+# 2. Deploy
+make kind-up
+
+# UI: http://localhost:8090   API: http://localhost:8080/healthz
+```
+
+See [`examples/`](examples/) for Kind and production Kubernetes deployment configs.
+
+### Option C: Local Development (Hot Reload)
 
 Use this when you want to iterate on code quickly:
 
@@ -218,18 +235,28 @@ See [docs/TESTING.md](docs/TESTING.md) for writing and running tests.
 
 | Command | Description |
 |---------|-------------|
+| **Docker Compose** | |
 | `make dev` | Start full stack via Docker Compose |
 | `make dev-down` | Stop all containers |
 | `make dev-restart` | Restart with new `.env` values (keeps data) |
 | `make dev-logs` | Follow all container logs |
 | `make dev-reset` | Destroy data volumes and restart fresh |
+| `make dev-status` | Show container status and ingestion progress |
 | `make re-ingest` | Re-trigger the Ingestion Watcher (scans for new files) |
 | `make re-scan` | Wipe all data and re-process everything (e.g. after enabling OSV) |
 | `make cve-refresh` | Check all known PURLs for new CVEs (without re-scanning SBOMs) |
 | `make migrate` | Run all pending database migrations |
+| **Kind (Local Kubernetes)** | |
+| `make kind-up` | Create Kind cluster and deploy SeeBOM via Helm |
+| `make kind-down` | Destroy the Kind cluster |
+| `make kind-build` | Build all container images and load them into Kind |
+| `make kind-deploy` | Build images, Helm upgrade, and restart pods |
+| `make kind-reingest` | Re-ingest all SBOMs (truncate data, re-queue, no re-download) |
+| **ClickHouse** | |
 | `make ch-only` | Start only ClickHouse (for local dev) |
 | `make ch-migrate` | Run SQL migrations against ClickHouse |
 | `make ch-shell` | Open ClickHouse CLI |
+| **Local Dev** | |
 | `make api` | Run API Gateway locally |
 | `make ingest` | Run Ingestion Watcher locally |
 | `make worker` | Run Parsing Worker locally |
@@ -238,6 +265,9 @@ See [docs/TESTING.md](docs/TESTING.md) for writing and running tests.
 | `make backend-test` | Run all Go tests |
 | `make backend-vet` | Run go vet + go fmt |
 | `make ui-build` | Build Angular for production |
+| **Images** | |
+| `make images` | Build all 5 container images locally (TAG=dev) |
+| `make images-push` | Build and push all images to GHCR |
 
 ---
 
@@ -284,6 +314,41 @@ docker compose up --force-recreate ingestion-watcher
 
 # To re-ingest everything from scratch (wipes all data):
 make dev-reset
+```
+
+---
+
+## License Policy
+
+By default, SeeBOM enforces the [CNCF Allowed Third-Party License Policy](https://github.com/cncf/foundation/blob/main/policies-guidance/allowed-third-party-license-policy.md):
+
+- **Permissive (allowed):** Apache-2.0, MIT, MIT-0, 0BSD, BSD-2-Clause, BSD-3-Clause, ISC, PSF-2.0, Python-2.0, PostgreSQL, UPL-1.0, X11, Zlib, OpenSSL, and a few more (18 total)
+- **Copyleft (flagged):** GPL, LGPL, AGPL, MPL-2.0, EPL, EUPL, CPAL, and others (21 total)
+- **Unknown:** Any license not in either list is flagged for review
+
+### CNCF Exception List
+
+The [CNCF license exceptions](https://github.com/cncf/foundation/blob/main/license-exceptions/exceptions.json) are automatically downloaded and applied. Packages covered by a CNCF Governing Board exception are marked as exempted rather than non-compliant.
+
+Exceptions with `"project": "All CNCF Projects"` are treated as blanket exceptions (apply to every SBOM).
+
+### Customising the Policy
+
+Override the default policy via Helm values:
+
+```yaml
+licensePolicy:
+  custom: |
+    {
+      "permissive": ["Apache-2.0", "MIT"],
+      "copyleft": ["GPL-3.0-only", "AGPL-3.0-only"]
+    }
+```
+
+Or edit the ConfigMap directly:
+
+```bash
+kubectl edit configmap seebom-license-policy -n seebom
 ```
 
 ---

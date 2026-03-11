@@ -1,6 +1,39 @@
 # SeeBOM – Release & Publishing Guide
 
-> **Updated:** 2026-03-09
+> **Updated:** 2026-03-11
+
+---
+
+## What's New in 0.1.2
+
+### 🚀 Features
+
+- **CNCF Allowed Third-Party License Policy as default** — The license policy now matches the official [CNCF Allowed Third-Party License Policy](https://github.com/cncf/foundation/blob/main/policies-guidance/allowed-third-party-license-policy.md). 18 SPDX licenses on the CNCF Allowlist (Apache-2.0, MIT, BSD-3-Clause, ISC, etc.) are classified as permissive. All other licenses require a Governing Board exception. The policy can be overridden via `licensePolicy.custom` in Helm values.
+
+- **CNCF exception handling** — Exceptions with `"project": "All CNCF Projects"` are automatically promoted to blanket exceptions. Compound license expressions (`GPL-2.0-only, GPL-2.0-or-later`, `MPL-2.0 OR LGPL-3.0-or-later`) are split into individual SPDX IDs. Substring matching allows CNCF-style short package names (e.g. `cyphar/filepath-securejoin`) to match full qualified SBOM names (e.g. `github.com/cyphar/filepath-securejoin`).
+
+- **License exceptions fallback** — Both the API Gateway and Parsing Worker now fall back to `/data/sboms/license-exceptions.json` (the CNCF file downloaded by the seed job) if the ConfigMap path is empty.
+
+- **Deployment examples** — New `examples/` directory with ready-to-use configs for Kind (local dev) and Kubernetes (production/staging).
+
+- **New Makefile targets** — `kind-build` (build + load images into Kind), `kind-deploy` (build + Helm upgrade), `kind-reingest` (truncate data + re-queue all SBOMs without re-downloading).
+
+- **Configurable PVC size** — `sbomSource.storageSize` in Helm values controls the SBOM PVC size (default: 1Gi, Kind example: 15Gi).
+
+### 🐛 Bug Fixes
+
+- **Archived packages query** — Fixed ClickHouse `JOIN` error (`Expected equi-join ON condition`) by switching to `CROSS JOIN` with a filtered subquery. The `/api/v1/packages/archived` endpoint now returns results instead of HTTP 500.
+
+- **SBOM seed job file deduplication** — The CNCF SBOM repo contains 6559 files across nested directories but only 1105 unique basenames. The seed job now flattens directory paths into filenames (`sbom/org/proj/ver/name.json` → `org_proj_ver_name.json`) so all files are preserved.
+
+- **SBOM detail page** — Fixed `forkJoin` in the Angular UI that cancelled all API calls when the archived-packages endpoint returned an error. Added `catchError` fallback.
+
+### 🔧 Maintenance
+
+- Removed stale compiled Go binaries (`backend/api-gateway`, `backend/parsing-worker`) from the repository; added them to `.gitignore`.
+- Updated test suite: 8 new tests for CNCF exception handling (compound licenses, blanket promotion, substring matching).
+
+---
 
 ## Container Images
 
@@ -23,8 +56,8 @@ Images are built for **linux/amd64** and **linux/arm64**.
 ### 1. Tag the release
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.2
+git push origin v0.1.2
 ```
 
 ### 2. What happens automatically
@@ -33,7 +66,7 @@ The GitHub Actions workflow (`.github/workflows/release.yml`) triggers on any `v
 
 1. **Builds all 5 container images** (multi-arch: amd64 + arm64)
 2. **Pushes them to ghcr.io** with two tags each:
-   - `ghcr.io/seebom-labs/seebom/<component>:0.1.0` (version)
+   - `ghcr.io/seebom-labs/seebom/<component>:0.1.2` (version)
    - `ghcr.io/seebom-labs/seebom/<component>:latest`
 3. **Packages the Helm chart** with the matching version
 4. **Pushes the Helm chart** as an OCI artifact to `oci://ghcr.io/seebom-labs/seebom/charts`
@@ -55,10 +88,10 @@ Release notes are grouped by PR labels (see `.github/release.yml`):
 
 ```bash
 # Check images exist
-docker pull ghcr.io/seebom-labs/seebom/api-gateway:0.1.0
+docker pull ghcr.io/seebom-labs/seebom/api-gateway:0.1.2
 
 # Check Helm chart
-helm show chart oci://ghcr.io/seebom-labs/seebom/charts/seebom --version 0.1.0
+helm show chart oci://ghcr.io/seebom-labs/seebom/charts/seebom --version 0.1.2
 ```
 
 ---
@@ -69,7 +102,7 @@ helm show chart oci://ghcr.io/seebom-labs/seebom/charts/seebom --version 0.1.0
 
 ```bash
 helm install seebom oci://ghcr.io/seebom-labs/seebom/charts/seebom \
-  --version 0.1.0 \
+  --version 0.1.2 \
   -f values-production.yaml
 ```
 
@@ -77,8 +110,8 @@ helm install seebom oci://ghcr.io/seebom-labs/seebom/charts/seebom \
 
 ```bash
 helm install seebom oci://ghcr.io/seebom-labs/seebom/charts/seebom \
-  --version 0.1.0 \
-  --set image.tag=0.1.0
+  --version 0.1.2 \
+  --set image.tag=0.1.2
 ```
 
 ---
@@ -103,8 +136,8 @@ If you contribute via a fork:
 2. **Merge the PR** into `main` of the main repo
 3. **Tag in the main repo** (not in the fork):
    ```bash
-   git tag v0.1.0
-   git push origin v0.1.0
+   git tag v0.1.2
+   git push origin v0.1.2
    ```
 
 > **Do not tag releases in your fork.** The `GITHUB_TOKEN` in a fork cannot push images to the main repo's GHCR, and the GitHub Release would be created in the fork instead of the main repo.
@@ -188,8 +221,8 @@ All runtime images run as `nobody:nobody` (backend) or `nginx` (UI) for security
 
 ## Versioning
 
-- **Git tags**: `v0.1.0`, `v0.2.0`, etc. (SemVer)
-- **Image tags**: `0.1.0` (without `v` prefix) + `latest`
+- **Git tags**: `v0.1.2`, `v0.2.0`, etc. (SemVer)
+- **Image tags**: `0.1.2` (without `v` prefix) + `latest`
 - **Helm chart version**: Matches the Git tag (auto-updated by CI)
 - `values.yaml` defaults to the latest released tag
 
@@ -203,12 +236,12 @@ To use a different registry, override in Helm:
 helm install seebom oci://ghcr.io/seebom-labs/seebom/charts/seebom \
   --set image.registry=my-registry.example.com \
   --set image.repository=my-org/seebom \
-  --set image.tag=0.1.0
+  --set image.tag=0.1.2
 ```
 
 Or build + push locally:
 
 ```bash
-make images-push REGISTRY=my-registry.example.com REPO=my-org/seebom TAG=0.1.0
+make images-push REGISTRY=my-registry.example.com REPO=my-org/seebom TAG=0.1.2
 ```
 

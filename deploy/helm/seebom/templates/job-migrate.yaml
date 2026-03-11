@@ -1,0 +1,60 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-migrate-{{ .Release.Revision }}
+  labels:
+    app.kubernetes.io/name: seebom
+    app.kubernetes.io/component: migrate
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 10
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: seebom
+        app.kubernetes.io/component: migrate
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: {{ .Values.clickhouse.installation.podTemplate.containerImage }}
+          command: ["/bin/sh", "/scripts/run-migrations.sh"]
+          env:
+            - name: CH_HOST
+              value: {{ .Values.clickhouse.host | quote }}
+            - name: CH_PORT
+              value: {{ .Values.clickhouse.port | quote }}
+            - name: CH_DATABASE
+              value: {{ .Values.clickhouse.database | quote }}
+            - name: CH_USER
+              value: {{ .Values.clickhouse.user | quote }}
+            - name: CH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-secret
+                  key: CLICKHOUSE_PASSWORD
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+              readOnly: true
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+      volumes:
+        - name: migrations
+          configMap:
+            name: {{ .Release.Name }}-migrations
+            items:
+              {{- range $path, $_ := .Files.Glob "migrations/*.sql" }}
+              - key: {{ base $path }}
+                path: {{ base $path }}
+              {{- end }}
+        - name: scripts
+          configMap:
+            name: {{ .Release.Name }}-migrations
+            defaultMode: 0755
+            items:
+              - key: run-migrations.sh
+                path: run-migrations.sh
+

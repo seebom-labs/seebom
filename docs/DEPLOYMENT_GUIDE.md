@@ -1,6 +1,6 @@
 # SeeBOM – Kubernetes Deployment Guide
 
-> **Updated:** 2026-03-08
+> **Updated:** 2026-03-11
 
 ## Prerequisites
 
@@ -13,21 +13,49 @@
 
 ## 1. SBOMs – Getting Data Into the Cluster
 
-SBOMs are loaded from a Git repository using **git-sync**. The Helm chart includes a git-sync initContainer that clones the repo before ingestion starts.
+SBOMs are loaded from a **PersistentVolumeClaim** (PVC) mounted at `/data/sboms`. There are three ways to populate this PVC. See also [`examples/kubernetes/README.md`](../examples/kubernetes/README.md) for complete Helm value examples.
 
-### Option A: Public SBOM Repository (default)
+### Option A: Seed Job (recommended for large repos)
+
+A Kubernetes Job runs at install time, does a shallow `git clone`, and flat-copies all SBOM files into the PVC. This is the most reliable method for large repos (e.g. `cncf/sbom` at ~14 GB with 6500+ SBOMs).
 
 ```yaml
-# values-production.yaml
+gitSync:
+  enabled: false
+
+seedJob:
+  sbomRepo: "https://github.com/cncf/sbom.git"
+  sbomBranch: main
+  # Also download the CNCF license exceptions into the PVC:
+  cncfExceptionsURL: "https://raw.githubusercontent.com/cncf/foundation/main/license-exceptions/exceptions.json"
+
+sbomSource:
+  storageSize: 20Gi
+```
+
+The seed job flattens nested directory structures (`org/project/version/file.spdx.json` → `org_project_version_file.spdx.json`) to avoid filename collisions.
+
+**To refresh SBOMs**, delete the seed job and re-run Helm upgrade:
+```bash
+kubectl delete job -n seebom -l app.kubernetes.io/component=seed-sboms
+helm upgrade seebom deploy/helm/seebom/ -n seebom -f my-values.yaml
+```
+
+### Option B: git-sync (for small repos < 1 GB)
+
+A [git-sync](https://github.com/kubernetes/git-sync) sidecar continuously pulls SBOMs from a Git repo into the PVC. Good for small repos that update frequently.
+
+```yaml
 gitSync:
   enabled: true
   repo: "https://github.com/your-org/sbom-repo.git"
   branch: main
+  depth: 1
+  period: "6h"
+  timeout: 120
 ```
 
-### Option B: Private SBOM Repository (SSH key)
-
-Create a secret with your deploy key:
+For **private repos**, create a Secret with your deploy key:
 
 ```bash
 kubectl create secret generic git-sync-credentials \
@@ -36,26 +64,45 @@ kubectl create secret generic git-sync-credentials \
 ```
 
 ```yaml
-# values-production.yaml
 gitSync:
   enabled: true
   repo: "git@github.com:your-org/sbom-repo.git"
-  branch: main
   secretName: git-sync-credentials
 ```
 
-### Option C: Pre-populated PVC (no git-sync)
+> **⚠️  Limitation:** git-sync runs as a sidecar and struggles with very large repos (multi-GB). For repos like `cncf/sbom` (~14 GB), the sidecar times out or OOM-kills. Use the **seed job** (Option A) instead.
 
-If you populate the PVC yourself (e.g. via a CI pipeline):
+### Option C: Pre-populated PVC (manual / CI pipeline)
+
+If your SBOMs are not in a Git repo, or come from a CI pipeline, S3, or an artifact registry:
 
 ```yaml
 gitSync:
   enabled: false
+# No seedJob — you manage the PVC content yourself.
+
 sbomSource:
   pvcName: my-preloaded-sbom-pvc
 ```
 
-> **Note:** VEX files (`*.openvex.json`, `*.vex.json`) should be placed alongside SBOM files in the same directory. They are never truncated by `SBOM_LIMIT`.
+Populate the PVC however you prefer (kubectl cp, CI job, initContainer, etc.), then trigger the Ingestion Watcher:
+```bash
+kubectl create job --from=cronjob/seebom-ingestion-watcher manual-ingest -n seebom
+```
+
+### Supported File Types
+
+The Ingestion Watcher scans the SBOM directory **recursively** for:
+
+| Pattern | Type |
+|---------|------|
+| `*.spdx.json` | SPDX SBOM |
+| `*.openvex.json` | OpenVEX statement |
+| `*.vex.json` | OpenVEX statement |
+
+Files are **deduplicated by SHA256 hash** — uploading the same file twice will not create duplicates.
+
+> **Note:** VEX files should be placed alongside SBOM files in the same directory. They are never truncated by `SBOM_LIMIT`.
 
 ---
 

@@ -5,6 +5,7 @@
 .PHONY: ingest worker api
 .PHONY: images images-push
 .PHONY: sync-labels
+.PHONY: kind-up kind-down kind-reingest kind-build kind-deploy
 
 SHELL := /bin/bash
 REGISTRY ?= ghcr.io
@@ -160,3 +161,41 @@ images-push: images ## Build and push all images to GHCR (TAG=dev)
 # ─── GitHub ──────────────────────────────────────────────────────────────────
 sync-labels: ## Sync GitHub labels from .github/labels.yml (requires gh + yq)
 	.github/scripts/sync-labels.sh
+
+# ─── Kind (local Kubernetes) ─────────────────────────────────────────────────
+kind-up: ## Deploy SeeBOM to a local Kind cluster (see local/secrets.env)
+	./local/setup.sh
+
+kind-down: ## Destroy the local Kind cluster
+	./local/teardown.sh
+
+kind-reingest: ## Re-ingest all SBOMs in Kind (no re-download, truncates data + re-queues)
+	@echo "🗑️  Truncating data tables..."
+	@source local/secrets.env 2>/dev/null; \
+	kubectl exec -n seebom chi-seebom-clickhouse-seebom-cluster-0-0-0 -c clickhouse -- \
+		clickhouse-client --database=seebom --password="$${CLICKHOUSE_PASSWORD:-seebom}" --multiquery \
+		--query "TRUNCATE TABLE ingestion_queue; TRUNCATE TABLE license_compliance; TRUNCATE TABLE vulnerabilities; TRUNCATE TABLE sbom_packages; TRUNCATE TABLE sboms; TRUNCATE TABLE vex_statements;"
+	@echo "♻️  Triggering ingestion watcher..."
+	@kubectl create job --from=cronjob/seebom-ingestion-watcher seebom-reingest-$$(date +%s) -n seebom
+	@echo "✅ Re-ingest started. Workers will re-process all SBOMs from the PVC."
+	@echo "   Monitor: curl -s http://localhost:8080/api/v1/stats/dashboard | jq .total_sboms"
+
+kind-build: images ## Build dev images and load them into the Kind cluster
+	@echo "📦 Loading images into Kind cluster..."
+	kind load docker-image $(REGISTRY)/$(REPO)/ingestion-watcher:$(TAG) --name seebom
+	kind load docker-image $(REGISTRY)/$(REPO)/parsing-worker:$(TAG)    --name seebom
+	kind load docker-image $(REGISTRY)/$(REPO)/api-gateway:$(TAG)       --name seebom
+	kind load docker-image $(REGISTRY)/$(REPO)/cve-refresher:$(TAG)     --name seebom
+	kind load docker-image $(REGISTRY)/$(REPO)/ui:$(TAG)                --name seebom
+	@echo "✅ Loaded 5 images into Kind (tag: $(TAG))"
+
+kind-deploy: kind-build ## Build images, load into Kind, and upgrade Helm release
+	@source local/secrets.env 2>/dev/null; \
+	helm upgrade seebom deploy/helm/seebom/ \
+		-n seebom \
+		-f local/values-local.yaml \
+		--set clickhouse.password="$${CLICKHOUSE_PASSWORD:-seebom}" \
+		--set github.token="$${GITHUB_TOKEN:-}"
+	@kubectl rollout restart deployment/seebom-api-gateway deployment/seebom-parsing-worker -n seebom
+	@echo "✅ Deployed. Pods restarting with new images."
+

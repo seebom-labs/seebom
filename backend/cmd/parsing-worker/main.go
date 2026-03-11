@@ -45,14 +45,15 @@ func main() {
 		log.Printf("Using default license policy (tried %s): %v", cfg.LicensePolicyFile, err)
 	}
 
-	// Load license exceptions if available.
+	// Load license exceptions if available (try config path, then SBOM dir fallback).
 	var exceptionsIndex *license.ExceptionIndex
-	if idx, err := license.LoadExceptions(cfg.ExceptionsFile); err == nil {
+	sbomDirExceptionsPath := cfg.SBOMDir + "/license-exceptions.json"
+	if idx, err := license.LoadExceptionsWithFallback(cfg.ExceptionsFile, sbomDirExceptionsPath); err == nil {
 		exceptionsIndex = idx
-		log.Printf("Loaded license exceptions from %s (%d blanket, %d specific)",
-			cfg.ExceptionsFile, len(idx.Raw.BlanketExceptions), len(idx.Raw.Exceptions))
+		log.Printf("Loaded license exceptions (%d blanket, %d specific)",
+			len(idx.Raw.BlanketExceptions), len(idx.Raw.Exceptions))
 	} else {
-		log.Printf("No license exceptions loaded (tried %s): %v", cfg.ExceptionsFile, err)
+		log.Printf("No license exceptions loaded (tried %s, %s): %v", cfg.ExceptionsFile, sbomDirExceptionsPath, err)
 	}
 
 	// Initialize GitHub license resolver for unknown licenses.

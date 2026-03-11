@@ -31,10 +31,19 @@ type Policy struct {
 	copyleft   map[string]bool
 }
 
-// built-in defaults, used when no policy file is provided.
+// built-in defaults based on the CNCF Allowed Third-Party License Policy:
+// https://github.com/cncf/foundation/blob/main/policies-guidance/allowed-third-party-license-policy.md
+// Apache-2.0 (CNCF project license) + the CNCF Allowlist are permissive.
+// Everything else requires a CNCF Governing Board exception.
 var defaultPermissive = []string{
-	"MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC",
-	"Unlicense", "0BSD", "CC0-1.0", "Zlib", "BSL-1.0", "PSF-2.0",
+	"Apache-2.0",
+	"MIT", "MIT-0",
+	"0BSD", "BSD-2-Clause", "BSD-2-Clause-FreeBSD", "BSD-3-Clause",
+	"ISC",
+	"PSF-2.0", "Python-2.0", "Python-2.0.1",
+	"PostgreSQL",
+	"UPL-1.0", "X11", "Zlib",
+	"OpenSSL", "OpenSSL-standalone", "SSLeay-standalone",
 }
 
 var defaultCopyleft = []string{

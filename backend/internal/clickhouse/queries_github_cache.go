@@ -114,7 +114,11 @@ func (c *Client) QueryArchivedPackages(ctx context.Context) ([]ArchivedPackageIn
 		FROM sbom_packages p FINAL
 		ARRAY JOIN p.package_names AS pkg_name, p.package_purls AS pkg_purl
 		JOIN sboms s FINAL ON p.sbom_id = s.sbom_id
-		JOIN github_repo_metadata m FINAL ON m.archived = true
+		CROSS JOIN (
+			SELECT repo, pushed_at, stargazers
+			FROM github_repo_metadata FINAL
+			WHERE archived = true
+		) m
 		WHERE lower(pkg_purl) LIKE concat('%', m.repo, '%')
 		ORDER BY project_name, s.source_file
 	`)

@@ -1,0 +1,74 @@
+{{- if not .Values.gitSync.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-seed-sboms-{{ .Release.Revision }}
+  labels:
+    app.kubernetes.io/name: seebom
+    app.kubernetes.io/component: seed-sboms
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: seebom
+        app.kubernetes.io/component: seed-sboms
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: seed
+          image: bitnami/git:latest
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -e
+              TARGET="/data/sboms"
+              mkdir -p "$TARGET"
+
+              SBOM_REPO="{{ .Values.seedJob.sbomRepo | default "https://github.com/cncf/sbom.git" }}"
+              SBOM_BRANCH="{{ .Values.seedJob.sbomBranch | default "main" }}"
+              echo "⏳ Cloning $SBOM_REPO (branch: $SBOM_BRANCH) ..."
+              git clone --depth 1 --branch "$SBOM_BRANCH" "$SBOM_REPO" /tmp/sbom-repo
+
+              echo "⏳ Copying SBOM files..."
+              # CNCF SBOM repo has nested dirs with duplicate basenames
+              # (e.g. 50× cli.json). Flatten paths into unique filenames:
+              #   sbom/argo-cd/argo-cd/2.5.0/argo-cd.json → argo-cd_argo-cd_2.5.0_argo-cd.json
+              REPO_ROOT="/tmp/sbom-repo"
+              find "$REPO_ROOT" -path '*/sbom/*' -name '*.json' -type f > /tmp/sbom_src.txt
+              while IFS= read -r f; do
+                rel="${f#$REPO_ROOT/sbom/}"
+                flat="${rel//\//_}"
+                cp "$f" "$TARGET/$flat"
+              done < /tmp/sbom_src.txt
+              # Also copy any top-level .spdx.json / VEX files (flat copy is fine here)
+              find "$REPO_ROOT" -maxdepth 2 -name '*.spdx.json' -exec cp {} "$TARGET/" \;
+              find "$REPO_ROOT" -maxdepth 2 -name '*.openvex.json' -exec cp {} "$TARGET/" \;
+              find "$REPO_ROOT" -maxdepth 2 -name '*.vex.json' -exec cp {} "$TARGET/" \;
+              find "$TARGET" -name '*.json' -not -name '*.openvex.json' -not -name '*.vex.json' -not -name 'license-*' -type f > /tmp/sbom_list.txt
+              SBOM_COUNT=$(wc -l < /tmp/sbom_list.txt)
+              find "$TARGET" \( -name '*.openvex.json' -o -name '*.vex.json' \) -type f > /tmp/vex_list.txt
+              VEX_COUNT=$(wc -l < /tmp/vex_list.txt)
+              echo "  Copied $SBOM_COUNT SBOM files and $VEX_COUNT VEX files"
+
+              {{- if .Values.seedJob.cncfExceptionsURL }}
+              echo "⏳ Downloading CNCF license exceptions..."
+              if curl -sSL "{{ .Values.seedJob.cncfExceptionsURL }}" -o "$TARGET/license-exceptions.json"; then
+                echo "  ✅ license-exceptions.json downloaded"
+              else
+                echo "  ⚠️ Failed to download exceptions (non-fatal)"
+              fi
+              {{- end }}
+
+              echo "✅ Seed complete: $SBOM_COUNT SBOMs, $VEX_COUNT VEX docs"
+          volumeMounts:
+            - name: sbom-data
+              mountPath: /data/sboms
+      volumes:
+        - name: sbom-data
+          persistentVolumeClaim:
+            claimName: {{ .Values.sbomSource.pvcName }}
+{{- end }}
+

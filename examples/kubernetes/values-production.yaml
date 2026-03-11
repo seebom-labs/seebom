@@ -1,0 +1,137 @@
+# SeeBOM – Production Helm Values
+#
+# Suitable for a real Kubernetes cluster (EKS, GKE, AKS, self-hosted).
+# Uses a seed job to clone SBOMs into a PVC (more reliable than git-sync for
+# large repos like cncf/sbom at ~14 GB). HA replicas, ClusterIP services.
+#
+# For small SBOM repos (< 1 GB), see values-minimal.yaml which uses git-sync.
+#
+# Usage:
+#   helm install seebom deploy/helm/seebom/ -n seebom -f values-production.yaml \
+#     --set clickhouse.password=<PASSWORD> \
+#     --set github.token=<GITHUB_PAT>
+
+# ─── Images ──────────────────────────────────────────────────────────────────
+image:
+  registry: ghcr.io
+  repository: seebom-labs/seebom
+  tag: "0.1.2"
+  pullPolicy: IfNotPresent
+
+# ─── ClickHouse ──────────────────────────────────────────────────────────────
+clickhouse:
+  host: chi-seebom-clickhouse-seebom-cluster-0-0
+  port: 9000
+  database: seebom
+  user: default
+  password: ""   # pass via --set or reference an existing K8s Secret
+  cluster:
+    name: seebom-cluster
+    shardsCount: 1
+    replicasCount: 2         # 2 replicas for HA
+  installation:
+    podTemplate:
+      containerImage: docker.io/clickhouse/clickhouse-server:24.8
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+    volumeClaimTemplate:
+      dataStorage: 50Gi      # production workloads need more storage
+      logStorage: 1Gi
+
+# ─── GitHub ──────────────────────────────────────────────────────────────────
+github:
+  token: ""   # pass via --set or reference an existing K8s Secret
+
+# ─── SBOM Source (seed job) ──────────────────────────────────────────────────
+# The seed job does a shallow git clone into a PVC on first install.
+# This is more reliable than git-sync for large repos (e.g. cncf/sbom ~14 GB)
+# because git-sync's sidecar model struggles with multi-gigabyte repos.
+#
+# To refresh SBOMs later, delete the seed job and re-run:
+#   kubectl delete job -n seebom -l app.kubernetes.io/component=seed-sboms
+#   helm upgrade seebom ...
+gitSync:
+  enabled: false
+
+seedJob:
+  sbomRepo: "https://github.com/cncf/sbom.git"    # ← change to your SBOM repo
+  sbomBranch: main
+  # Download CNCF license exceptions into the SBOM PVC:
+  cncfExceptionsURL: "https://raw.githubusercontent.com/cncf/foundation/main/license-exceptions/exceptions.json"
+
+sbomSource:
+  pvcName: seebom-sbom-data
+  mountPath: /data/sboms
+  storageSize: 20Gi
+
+# ─── License Config ─────────────────────────────────────────────────────────
+# Default: CNCF Allowed Third-Party License Policy
+# (Apache-2.0 + CNCF Allowlist are permissive, everything else needs an exception)
+licenseExceptions:
+  enabled: true
+  mountPath: /data/config/license-exceptions.json
+
+licensePolicy:
+  enabled: true
+  mountPath: /data/config/license-policy.json
+  # Override the default CNCF policy if your org has different rules:
+  # custom: |
+  #   {
+  #     "description": "My org policy",
+  #     "permissive": ["Apache-2.0", "MIT", "BSD-3-Clause"],
+  #     "copyleft": ["GPL-2.0-only", "GPL-3.0-only", "AGPL-3.0-only"]
+  #   }
+
+# ─── Ingestion Watcher ──────────────────────────────────────────────────────
+ingestionWatcher:
+  schedule: "0 */6 * * *"    # Every 6 hours
+  sbomLimit: 0
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 500m, memory: 512Mi }
+
+# ─── Parsing Workers ────────────────────────────────────────────────────────
+parsingWorker:
+  replicas: 5                # scale up for faster processing
+  batchSize: 50
+  skipOSV: false
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits:   { cpu: "1", memory: 1Gi }
+
+# ─── API Gateway ────────────────────────────────────────────────────────────
+apiGateway:
+  replicas: 2                # HA
+  port: 8080
+  service:
+    type: ClusterIP          # use Ingress to expose
+    port: 80
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits:   { cpu: 500m, memory: 256Mi }
+
+# ─── UI ─────────────────────────────────────────────────────────────────────
+ui:
+  replicas: 2                # HA
+  service:
+    type: ClusterIP          # use Ingress to expose
+    port: 80
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits:   { cpu: 200m, memory: 128Mi }
+  customTheme:
+    enabled: false
+
+# ─── CVE Refresher ──────────────────────────────────────────────────────────
+cveRefresher:
+  enabled: true
+  schedule: "0 2 * * *"      # Daily at 2 AM
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 500m, memory: 512Mi }
+

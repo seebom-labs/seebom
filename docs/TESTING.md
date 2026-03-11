@@ -1,6 +1,6 @@
 # SeeBOM – Testing Guide
 
-> **Updated:** 2026-03-10
+> **Updated:** 2026-03-11
 
 ## Quick Start
 
@@ -80,13 +80,13 @@ These packages contain only data types (structs) with no logic:
 | `config` | 2 | Default values, custom env vars |
 | `github/purl` | 11 | ExtractGitHubRepo: golang github.com, subpath, pkg:github scheme, non-github, npm, empty, qualifiers, fragments, missing repo, azure submodule, hamba v2 |
 | `github/resolver` | 8 | Resolve (happy path, cache hit, non-GitHub PURL, 404), ResolveWithMetadata (archived repo, license extraction), PreloadCache, CacheEntries |
-| `license` | 11 | Categorize (10 SPDX IDs), Check, CheckWithExceptions (blanket + package), LoadPolicy, LoadExceptions, BuildIndex, edge cases |
+| `license` | 26 | Categorize (12 SPDX IDs incl. BSD-3-Clause, ISC, 0BSD), Check, CheckWithExceptions (blanket + package + prefix), LoadPolicy, LoadExceptions, LoadExceptionsWithFallback (4 scenarios), BuildIndex (empty, All CNCF Projects promoted to blanket, compound OR, compound AND), IsExempt substring matching (package+license, package-any), splitLicenses (6 patterns), edge cases |
 | `osv` | 5 | Empty input, mock server, server error, context cancellation, no-vulns response |
 | `osvutil` | 21+ | ClassifySeverity (10 CVSS scenarios), ParseCVSSScore (5 inputs), ExtractFixedVersion (4 scenarios), ExtractAffectedVersions (3 scenarios) |
 | `repo` | 5 | File scanning (SBOM + VEX detection), empty dir, nested dirs, SHA256 consistency, nonexistent dir |
 | `spdx` | 5 | Full parse, invalid JSON, empty packages, deterministic SBOM ID, license fallback |
 | `vex` | 5 (+8 subtests) | Full parse, invalid JSON, empty doc, normalizeVulnID (8 URL patterns), URL-based vuln @id |
-| **Total** | **73+ tests** | |
+| **Total** | **87+ tests** | |
 
 ---
 

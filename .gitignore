@@ -8,6 +8,12 @@
 *.so
 *.dylib
 
+# Compiled Go binaries (built by `go build`)
+backend/api-gateway
+backend/parsing-worker
+backend/ingestion-watcher
+backend/cve-refresher
+
 # Test binary, built with `go test -c`
 *.test
 
@@ -26,6 +32,9 @@ go.work.sum
 
 # env file
 .env
+
+# Local kind deployment (secrets, overrides)
+local/
 
 # Editor/IDE
 # .idea/

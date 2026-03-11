@@ -4,12 +4,16 @@
 image:
   registry: ghcr.io
   repository: seebom-labs/seebom
-  tag: "0.1.0"
+  tag: "0.1.2"
   pullPolicy: IfNotPresent
+
+# GitHub API token for license resolution (optional, increases rate limit from 60 to 5000 req/h)
+github:
+  token: ""
 
 # ClickHouse (provisioned via ClickHouse Operator)
 clickhouse:
-  host: chi-seebom-cluster-0-0
+  host: chi-seebom-clickhouse-seebom-cluster-0-0
   port: 9000
   database: seebom
   user: default
@@ -40,6 +44,7 @@ clickhouse:
 sbomSource:
   pvcName: seebom-sbom-data
   mountPath: /data/sboms
+  storageSize: 1Gi
 
 # git-sync: automatically pulls SBOMs from a Git repository into the PVC.
 # Runs as an initContainer on the watcher + sidecar on workers.
@@ -51,6 +56,7 @@ gitSync:
   depth: 1          # shallow clone
   period: "6h"      # re-sync interval (sidecar mode)
   root: /data/sboms
+  timeout: 120       # seconds for git clone/checkout (increase for large repos)
   # For private repos, mount a Secret with SSH key or token:
   # secretName: git-sync-credentials
 
@@ -133,4 +139,12 @@ cveRefresher:
     limits:
       cpu: 500m
       memory: 512Mi
+
+# Seed Job (only used when gitSync.enabled=false)
+# Clones an SBOM git repo into the PVC on first install.
+seedJob:
+  sbomRepo: "https://github.com/cncf/sbom.git"
+  sbomBranch: main
+  # Set to download CNCF license exceptions into the SBOM PVC:
+  # cncfExceptionsURL: "https://raw.githubusercontent.com/cncf/foundation/main/license-exceptions/exceptions.json"
 

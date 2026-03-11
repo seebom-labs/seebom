@@ -1,0 +1,128 @@
+# SeeBOM – Helm values for local Kind deployment
+#
+# This file is an example. The actual file used at deploy time lives in
+# local/values-local.yaml (git-ignored, may contain site-specific tweaks).
+#
+# Usage:
+#   helm upgrade --install seebom deploy/helm/seebom/ \
+#     -n seebom -f examples/kind/values-kind.yaml \
+#     --set clickhouse.password=<YOUR_PASSWORD>
+
+# ─── Images ──────────────────────────────────────────────────────────────────
+# For local dev, build images with `make images TAG=dev` and load them into
+# Kind with `kind load docker-image ... --name seebom`.
+# For released versions, set tag to a release like "0.1.2" and pullPolicy to IfNotPresent.
+image:
+  registry: ghcr.io
+  repository: seebom-labs/seebom
+  tag: "0.1.2"
+  pullPolicy: IfNotPresent
+
+# ─── ClickHouse ──────────────────────────────────────────────────────────────
+clickhouse:
+  host: chi-seebom-clickhouse-seebom-cluster-0-0
+  port: 9000
+  database: seebom
+  user: default
+  password: ""   # injected via --set or K8s Secret
+  cluster:
+    name: seebom-cluster
+    shardsCount: 1
+    replicasCount: 1
+  installation:
+    podTemplate:
+      containerImage: docker.io/clickhouse/clickhouse-server:24.8
+      resources:
+        limits:
+          cpu: "1"
+          memory: 2Gi
+        requests:
+          cpu: 250m
+          memory: 1Gi
+    volumeClaimTemplate:
+      dataStorage: 2Gi
+      logStorage: 100Mi
+
+# ─── GitHub ──────────────────────────────────────────────────────────────────
+github:
+  token: ""   # injected via --set or K8s Secret
+
+# ─── SBOM Source ─────────────────────────────────────────────────────────────
+# Disable git-sync and use a one-shot seed job instead.
+# The seed job clones the CNCF SBOM repo into a PVC.
+gitSync:
+  enabled: false
+
+seedJob:
+  sbomRepo: "https://github.com/cncf/sbom.git"
+  sbomBranch: main
+  cncfExceptionsURL: "https://raw.githubusercontent.com/cncf/foundation/main/license-exceptions/exceptions.json"
+
+sbomSource:
+  pvcName: seebom-sbom-data
+  mountPath: /data/sboms
+  storageSize: 15Gi     # CNCF repo = ~14 GB (6500+ SBOMs)
+
+# ─── License Config ─────────────────────────────────────────────────────────
+# Uses the CNCF Allowed Third-Party License Policy by default (from the Helm
+# chart ConfigMap). Override with licensePolicy.custom if needed.
+licenseExceptions:
+  enabled: true
+  mountPath: /data/config/license-exceptions.json
+
+licensePolicy:
+  enabled: true
+  mountPath: /data/config/license-policy.json
+  # Uncomment to override the default CNCF policy:
+  # custom: |
+  #   {
+  #     "permissive": ["Apache-2.0", "MIT"],
+  #     "copyleft": ["GPL-3.0-only", "AGPL-3.0-only"]
+  #   }
+
+# ─── Workloads (scaled down for local) ──────────────────────────────────────
+ingestionWatcher:
+  schedule: "*/30 * * * *"    # Every 30 min (faster feedback for dev)
+  sbomLimit: 0
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits:   { cpu: 250m, memory: 256Mi }
+
+parsingWorker:
+  replicas: 2
+  batchSize: 25
+  skipOSV: false
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 500m, memory: 512Mi }
+
+apiGateway:
+  replicas: 1
+  port: 8080
+  service:
+    type: NodePort
+    port: 80
+    nodePort: 30081       # maps to host :8080 via Kind config
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits:   { cpu: 250m, memory: 128Mi }
+
+ui:
+  replicas: 1
+  service:
+    type: NodePort
+    port: 80
+    nodePort: 30080       # maps to host :8090 via Kind config
+  resources:
+    requests: { cpu: 25m, memory: 32Mi }
+    limits:   { cpu: 100m, memory: 64Mi }
+  customTheme:
+    enabled: false
+
+cveRefresher:
+  enabled: true
+  schedule: "0 */4 * * *"    # Every 4h
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits:   { cpu: 250m, memory: 256Mi }
+

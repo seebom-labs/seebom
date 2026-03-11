@@ -10,6 +10,10 @@ spec:
   configuration:
     clusters:
       - name: {{ .Values.clickhouse.cluster.name }}
+        templates:
+          podTemplate: pod-template
+          dataVolumeClaimTemplate: data-volume-template
+          logVolumeClaimTemplate: log-volume-template
         layout:
           shardsCount: {{ .Values.clickhouse.cluster.shardsCount }}
           replicasCount: {{ .Values.clickhouse.cluster.replicasCount }}

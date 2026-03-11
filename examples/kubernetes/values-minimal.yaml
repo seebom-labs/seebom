@@ -1,0 +1,119 @@
+# SeeBOM – Minimal Helm Values (git-sync)
+#
+# Single-replica deployment suitable for CI, staging, or quick evaluation.
+# Uses git-sync to continuously pull SBOMs from a Git repo.
+#
+# ⚠️  git-sync works well for small/medium SBOM repos (< 1 GB).
+#     For large repos like cncf/sbom (~14 GB), use values-production.yaml
+#     which uses a seed job instead.
+#
+# Usage:
+#   helm install seebom deploy/helm/seebom/ -n seebom -f values-minimal.yaml \
+#     --set clickhouse.password=<PASSWORD>
+
+# ─── Images ──────────────────────────────────────────────────────────────────
+image:
+  registry: ghcr.io
+  repository: seebom-labs/seebom
+  tag: "0.1.2"
+  pullPolicy: IfNotPresent
+
+# ─── ClickHouse ──────────────────────────────────────────────────────────────
+clickhouse:
+  host: chi-seebom-clickhouse-seebom-cluster-0-0
+  port: 9000
+  database: seebom
+  user: default
+  password: ""
+  cluster:
+    name: seebom-cluster
+    shardsCount: 1
+    replicasCount: 1
+  installation:
+    podTemplate:
+      containerImage: docker.io/clickhouse/clickhouse-server:24.8
+      resources:
+        limits:   { cpu: "1", memory: 2Gi }
+        requests: { cpu: 250m, memory: 1Gi }
+    volumeClaimTemplate:
+      dataStorage: 5Gi
+      logStorage: 100Mi
+
+# ─── GitHub (optional) ──────────────────────────────────────────────────────
+github:
+  token: ""
+
+# ─── SBOM Source (seed job) ──────────────────────────────────────────────────
+# ─── SBOM Source (git-sync for small repos) ─────────────────────────────────
+# git-sync runs as a sidecar and continuously pulls from your Git repo.
+# Good for repos under ~1 GB. For large repos, use values-production.yaml.
+gitSync:
+  enabled: true
+  image: registry.k8s.io/git-sync/git-sync:v4.4.0
+  repo: "https://github.com/your-org/sbom-repo.git"   # ← your SBOM repo
+  branch: main
+  depth: 1
+  period: "6h"
+  root: /data/sboms
+  timeout: 120
+  # For private repos, mount a Secret with SSH key or token:
+  # secretName: git-sync-credentials
+
+sbomSource:
+  pvcName: seebom-sbom-data
+  mountPath: /data/sboms
+  storageSize: 5Gi
+
+# ─── License Config ─────────────────────────────────────────────────────────
+licenseExceptions:
+  enabled: true
+  mountPath: /data/config/license-exceptions.json
+
+licensePolicy:
+  enabled: true
+  mountPath: /data/config/license-policy.json
+
+# ─── Workloads (minimal) ────────────────────────────────────────────────────
+ingestionWatcher:
+  schedule: "0 */6 * * *"
+  sbomLimit: 0
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits:   { cpu: 250m, memory: 256Mi }
+
+parsingWorker:
+  replicas: 1
+  batchSize: 25
+  skipOSV: false
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 500m, memory: 512Mi }
+
+apiGateway:
+  replicas: 1
+  port: 8080
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits:   { cpu: 250m, memory: 128Mi }
+
+ui:
+  replicas: 1
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    requests: { cpu: 25m, memory: 32Mi }
+    limits:   { cpu: 100m, memory: 64Mi }
+  customTheme:
+    enabled: false
+
+cveRefresher:
+  enabled: true
+  schedule: "0 2 * * *"
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits:   { cpu: 250m, memory: 256Mi }
+

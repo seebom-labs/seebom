@@ -10,7 +10,8 @@ import {
   DependencyNode,
   ArchivedPackageInfo,
 } from '../../core/api.models';
-import { forkJoin } from 'rxjs';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 
 type Tab = 'vulns' | 'licenses' | 'deps';
 
@@ -266,7 +267,7 @@ export class SbomDetailComponent implements OnInit {
       vulns: this.api.getSbomVulnerabilities(sbomId),
       licenses: this.api.getSbomLicenses(sbomId),
       deps: this.api.getSbomDependencies(sbomId),
-      archived: this.api.getArchivedPackages(),
+      archived: this.api.getArchivedPackages().pipe(catchError(() => of([] as ArchivedPackageInfo[]))),
     }).subscribe(({ detail, vulns, licenses, deps, archived }) => {
       this.detail = detail;
       this.vulns = vulns;

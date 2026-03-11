@@ -3,6 +3,7 @@ package license
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -13,7 +14,9 @@ func TestCategorize(t *testing.T) {
 	}{
 		{"MIT", CategoryPermissive},
 		{"Apache-2.0", CategoryPermissive},
-		{"BSD-3-Clause", CategoryPermissive},
+		{"BSD-3-Clause", CategoryPermissive}, // CNCF allowlist
+		{"ISC", CategoryPermissive},          // CNCF allowlist
+		{"0BSD", CategoryPermissive},         // CNCF allowlist
 		{"GPL-3.0-only", CategoryCopyleft},
 		{"AGPL-3.0-or-later", CategoryCopyleft},
 		{"MPL-2.0", CategoryCopyleft},
@@ -269,6 +272,75 @@ func TestLoadExceptions_MissingFile(t *testing.T) {
 	}
 }
 
+func TestLoadExceptionsWithFallback_PrimaryPath(t *testing.T) {
+	exceptionsJSON := `{
+		"version": "1.0.0",
+		"blanketExceptions": [
+			{"id": "b1", "license": "MPL-2.0", "status": "approved", "comment": "ok"}
+		],
+		"exceptions": []
+	}`
+	tmpDir := t.TempDir()
+	primary := filepath.Join(tmpDir, "primary.json")
+	if err := os.WriteFile(primary, []byte(exceptionsJSON), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	idx, err := LoadExceptionsWithFallback(primary, "/nonexistent/fallback.json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(idx.Raw.BlanketExceptions) != 1 {
+		t.Errorf("expected 1 blanket exception, got %d", len(idx.Raw.BlanketExceptions))
+	}
+}
+
+func TestLoadExceptionsWithFallback_FallbackPath(t *testing.T) {
+	// Primary has empty exceptions, fallback has real data.
+	emptyJSON := `{"version":"1.0.0","blanketExceptions":[],"exceptions":[]}`
+	fullJSON := `{
+		"version": "1.0.0",
+		"blanketExceptions": [
+			{"id": "b1", "license": "BSD-3-Clause", "status": "approved", "comment": "ok"}
+		],
+		"exceptions": []
+	}`
+	tmpDir := t.TempDir()
+	primary := filepath.Join(tmpDir, "primary.json")
+	fallback := filepath.Join(tmpDir, "fallback.json")
+	if err := os.WriteFile(primary, []byte(emptyJSON), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fallback, []byte(fullJSON), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	idx, err := LoadExceptionsWithFallback(primary, fallback)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(idx.Raw.BlanketExceptions) != 1 {
+		t.Errorf("expected 1 blanket exception from fallback, got %d", len(idx.Raw.BlanketExceptions))
+	}
+	if idx.Raw.BlanketExceptions[0].License != "BSD-3-Clause" {
+		t.Errorf("expected BSD-3-Clause from fallback, got %s", idx.Raw.BlanketExceptions[0].License)
+	}
+}
+
+func TestLoadExceptionsWithFallback_AllMissing(t *testing.T) {
+	_, err := LoadExceptionsWithFallback("/nonexistent/a.json", "/nonexistent/b.json")
+	if err == nil {
+		t.Error("expected error when all paths are missing")
+	}
+}
+
+func TestLoadExceptionsWithFallback_EmptyPaths(t *testing.T) {
+	_, err := LoadExceptionsWithFallback("", "")
+	if err == nil {
+		t.Error("expected error for empty paths")
+	}
+}
+
 func TestBuildIndex_Empty(t *testing.T) {
 	idx := BuildIndex(&ExceptionsFile{})
 	if idx == nil {
@@ -297,4 +369,180 @@ func TestCheck_MismatchedLengths(t *testing.T) {
 	results := Check([]string{"pkg-a"}, []string{})
 	// Should handle gracefully (empty or partial results).
 	_ = results
+}
+
+func TestBuildIndex_AllCNCFProjectsPromotedToBlanket(t *testing.T) {
+	// CNCF exceptions with "All CNCF Projects" should be treated as blanket exceptions.
+	ef := &ExceptionsFile{
+		Exceptions: []Exception{
+			{
+				ID:      "blanket-ebpf-gpl",
+				Package: "In-kernel eBPF programs",
+				License: "GPL-2.0-only, GPL-2.0-or-later",
+				Project: "All CNCF Projects",
+				Status:  "approved",
+				Comment: "GPL-2.0 permitted for in-kernel eBPF programs",
+			},
+		},
+	}
+	idx := BuildIndex(ef)
+
+	// Both GPL-2.0-only and GPL-2.0-or-later should be blanket-exempted.
+	exempt, reason := idx.IsExempt("any-package", "GPL-2.0-only")
+	if !exempt {
+		t.Error("expected GPL-2.0-only to be blanket exempted via All CNCF Projects")
+	}
+	if reason == "" {
+		t.Error("expected non-empty reason")
+	}
+
+	exempt2, _ := idx.IsExempt("another-package", "GPL-2.0-or-later")
+	if !exempt2 {
+		t.Error("expected GPL-2.0-or-later to be blanket exempted via All CNCF Projects")
+	}
+
+	// Non-listed license should NOT be exempt.
+	exempt3, _ := idx.IsExempt("pkg", "GPL-3.0-only")
+	if exempt3 {
+		t.Error("expected GPL-3.0-only to NOT be exempted")
+	}
+}
+
+func TestBuildIndex_CompoundLicenseOR(t *testing.T) {
+	ef := &ExceptionsFile{
+		Exceptions: []Exception{
+			{
+				ID:      "exc-libpathrs",
+				Package: "libpathrs",
+				License: "MPL-2.0 OR LGPL-3.0-or-later",
+				Project: "All CNCF Projects",
+				Status:  "approved",
+				Comment: "libpathrs blanket exception",
+			},
+		},
+	}
+	idx := BuildIndex(ef)
+
+	// Both MPL-2.0 and LGPL-3.0-or-later should be blanket-exempted.
+	exempt, _ := idx.IsExempt("any-pkg", "MPL-2.0")
+	if !exempt {
+		t.Error("expected MPL-2.0 to be blanket exempted")
+	}
+	exempt2, _ := idx.IsExempt("any-pkg", "LGPL-3.0-or-later")
+	if !exempt2 {
+		t.Error("expected LGPL-3.0-or-later to be blanket exempted")
+	}
+}
+
+func TestBuildIndex_CompoundLicenseAND(t *testing.T) {
+	ef := &ExceptionsFile{
+		Exceptions: []Exception{
+			{
+				ID:      "exc-securejoin",
+				Package: "cyphar/filepath-securejoin",
+				License: "MPL-2.0 AND BSD-3-Clause",
+				Project: "All CNCF Projects",
+				Status:  "approved",
+				Comment: "filepath-securejoin blanket exception",
+			},
+		},
+	}
+	idx := BuildIndex(ef)
+
+	// Both MPL-2.0 and BSD-3-Clause should be blanket-exempted.
+	exempt, _ := idx.IsExempt("any-pkg", "MPL-2.0")
+	if !exempt {
+		t.Error("expected MPL-2.0 to be blanket exempted via AND split")
+	}
+	exempt2, _ := idx.IsExempt("any-pkg", "BSD-3-Clause")
+	if !exempt2 {
+		t.Error("expected BSD-3-Clause to be blanket exempted via AND split")
+	}
+}
+
+func TestIsExempt_SubstringPackageMatch(t *testing.T) {
+	// CNCF exception uses short name, SBOM has full qualified name.
+	ef := &ExceptionsFile{
+		Exceptions: []Exception{
+			{
+				ID:      "exc-foo",
+				Package: "cyphar/filepath-securejoin",
+				License: "MPL-2.0",
+				Project: "containerd",
+				Status:  "approved",
+				Comment: "securejoin exception",
+			},
+		},
+	}
+	idx := BuildIndex(ef)
+
+	// Full Go module path should match via substring.
+	exempt, reason := idx.IsExempt("github.com/cyphar/filepath-securejoin", "MPL-2.0")
+	if !exempt {
+		t.Error("expected substring match for github.com/cyphar/filepath-securejoin")
+	}
+	if !strings.Contains(reason, "exc-foo") {
+		t.Errorf("expected reason to contain exc-foo, got %s", reason)
+	}
+
+	// Exact match should also work.
+	exempt2, _ := idx.IsExempt("cyphar/filepath-securejoin", "MPL-2.0")
+	if !exempt2 {
+		t.Error("expected exact match for cyphar/filepath-securejoin")
+	}
+
+	// Non-matching package should NOT be exempt.
+	exempt3, _ := idx.IsExempt("github.com/other/package", "MPL-2.0")
+	if exempt3 {
+		t.Error("expected non-matching package to NOT be exempt")
+	}
+}
+
+func TestIsExempt_SubstringPackageAnyLicense(t *testing.T) {
+	ef := &ExceptionsFile{
+		Exceptions: []Exception{
+			{
+				ID:      "exc-any",
+				Package: "eclipse-ee4j/expressly",
+				Status:  "approved",
+				Comment: "expressly exception",
+			},
+		},
+	}
+	idx := BuildIndex(ef)
+
+	// Substring match on package-only exception (any license).
+	exempt, _ := idx.IsExempt("org.eclipse.expressly/eclipse-ee4j/expressly", "EPL-2.0")
+	if !exempt {
+		t.Error("expected substring match for package-only exception")
+	}
+}
+
+func TestSplitLicenses(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected []string
+	}{
+		{"MIT", []string{"MIT"}},
+		{"GPL-2.0-only, GPL-2.0-or-later", []string{"GPL-2.0-only", "GPL-2.0-or-later"}},
+		{"MPL-2.0 OR LGPL-3.0-or-later", []string{"MPL-2.0", "LGPL-3.0-or-later"}},
+		{"MPL-2.0 AND BSD-3-Clause", []string{"MPL-2.0", "BSD-3-Clause"}},
+		{"", nil},
+		{"  Apache-2.0  ", []string{"Apache-2.0"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := splitLicenses(tt.input)
+			if len(got) != len(tt.expected) {
+				t.Errorf("splitLicenses(%q) = %v, want %v", tt.input, got, tt.expected)
+				return
+			}
+			for i := range got {
+				if got[i] != tt.expected[i] {
+					t.Errorf("splitLicenses(%q)[%d] = %q, want %q", tt.input, i, got[i], tt.expected[i])
+				}
+			}
+		})
+	}
 }
