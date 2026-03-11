@@ -22,6 +22,19 @@ clickhouse:
     name: seebom-cluster
     shardsCount: 1
     replicasCount: 1
+  installation:
+    podTemplate:
+      containerImage: docker.io/clickhouse/clickhouse-server:24.8
+      resources:
+        limits:
+          cpu: 1000m
+          memory: 1Gi
+        requests:
+          cpu: 1000m
+          memory: 1Gi
+    volumeClaimTemplate:
+      dataStorage: 1Gi
+      logStorage: 100Mi
 
 # SBOM source (PVC populated by git-sync sidecar)
 sbomSource:
