@@ -24,3 +24,26 @@ spec:
       {{ .Values.clickhouse.user }}/password: {{ .Values.clickhouse.password | quote }}
       {{- end }}
       {{ .Values.clickhouse.user }}/networks/ip: "::/0"
+  templates:
+    podTemplates:
+      - name: pod-template
+        spec:
+          containers:
+            - name: clickhouse
+              image: {{ .Values.clickhouse.installation.podTemplate.containerImage }}
+              resources: {{ toYaml .Values.clickhouse.installation.podTemplate.resources | nindent 16 }}
+    volumeClaimTemplates:
+      - name: data-volume-template
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: {{ .Values.clickhouse.installation.volumeClaimTemplate.dataStorage }}
+      - name: log-volume-template
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: {{ .Values.clickhouse.installation.volumeClaimTemplate.logStorage }}
