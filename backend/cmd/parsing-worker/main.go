@@ -215,6 +215,13 @@ func processSBOMJob(ctx context.Context, cfg *config.Config, chClient *clickhous
 
 		var vulns []models.Vulnerability
 		if len(purls) > 0 {
+			// Collect vuln IDs from batch queries, then hydrate with full details.
+			type vulnPURL struct {
+				id   string
+				purl string
+			}
+			var discovered []vulnPURL
+
 			// Chunk PURLs into batches of 1000 (OSV API limit).
 			const chunkSize = 1000
 			for i := 0; i < len(purls); i += chunkSize {
@@ -230,33 +237,60 @@ func processSBOMJob(ctx context.Context, cfg *config.Config, chClient *clickhous
 					continue
 				}
 
-				// Map OSV results back to PURLs and build vulnerability models.
 				for j, qr := range osvResp.Results {
 					if len(qr.Vulns) == 0 {
 						continue
 					}
 					purl := chunk[j]
 					for _, v := range qr.Vulns {
-						severity := osvutil.ClassifySeverity(v)
-						fixedVersion := osvutil.ExtractFixedVersion(v)
-						affectedVersions := osvutil.ExtractAffectedVersions(v)
-
-						// Serialize raw OSV JSON for detail view.
-						rawJSON, _ := json.Marshal(v)
-
-						vulns = append(vulns, models.Vulnerability{
-							DiscoveredAt:     time.Now(),
-							SBOMID:           result.SBOM.SBOMID,
-							SourceFile:       job.SourceFile,
-							PURL:             purl,
-							VulnID:           v.ID,
-							Severity:         severity,
-							Summary:          v.Summary,
-							AffectedVersions: affectedVersions,
-							FixedVersion:     fixedVersion,
-							OSVJSON:          string(rawJSON),
-						})
+						discovered = append(discovered, vulnPURL{id: v.ID, purl: purl})
 					}
+				}
+			}
+
+			if len(discovered) > 0 {
+				// Collect unique vuln IDs and hydrate with full details.
+				uniqueIDs := make([]string, 0)
+				seen := make(map[string]struct{})
+				for _, d := range discovered {
+					if _, ok := seen[d.id]; !ok {
+						seen[d.id] = struct{}{}
+						uniqueIDs = append(uniqueIDs, d.id)
+					}
+				}
+
+				hydrated, err := osvClient.HydrateVulns(ctx, uniqueIDs)
+				if err != nil {
+					log.Printf("  WARNING: Hydration failed: %v", err)
+				}
+
+				// Build vulnerability models using hydrated data.
+				for _, d := range discovered {
+					var entry osv.VulnEntry
+					if h, ok := hydrated[d.id]; ok {
+						entry = *h
+					} else {
+						// Fallback: minimal entry if hydration failed for this ID.
+						entry = osv.VulnEntry{ID: d.id}
+					}
+
+					severity := osvutil.ClassifySeverity(entry)
+					fixedVersion := osvutil.ExtractFixedVersion(entry)
+					affectedVersions := osvutil.ExtractAffectedVersions(entry)
+					rawJSON, _ := json.Marshal(entry)
+
+					vulns = append(vulns, models.Vulnerability{
+						DiscoveredAt:     time.Now(),
+						SBOMID:           result.SBOM.SBOMID,
+						SourceFile:       job.SourceFile,
+						PURL:             d.purl,
+						VulnID:           entry.ID,
+						Severity:         severity,
+						Summary:          entry.Summary,
+						AffectedVersions: affectedVersions,
+						FixedVersion:     fixedVersion,
+						OSVJSON:          string(rawJSON),
+					})
 				}
 			}
 

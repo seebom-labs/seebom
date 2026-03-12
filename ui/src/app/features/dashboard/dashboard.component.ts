@@ -29,8 +29,13 @@ import { HorizontalBarChartComponent, BarItem } from '../../shared/charts/horizo
             <span class="kpi-label">Packages</span>
           </div>
           <div class="kpi-card warn">
-            <span class="kpi-value">{{ stats.effective_vulnerabilities }}</span>
-            <span class="kpi-label">Effective Vulns</span>
+            @if (stats.total_vex_statements > 0) {
+              <span class="kpi-value">{{ stats.effective_vulnerabilities }}</span>
+              <span class="kpi-label">Effective Vulns</span>
+            } @else {
+              <span class="kpi-value">{{ stats.total_vulnerabilities }}</span>
+              <span class="kpi-label">Total Vulns</span>
+            }
           </div>
           <div class="kpi-card ok">
             <span class="kpi-value">{{ stats.suppressed_by_vex }}</span>
@@ -57,7 +62,15 @@ import { HorizontalBarChartComponent, BarItem } from '../../shared/charts/horizo
           </div>
           <div class="chart-card">
             <h3>VEX Effectiveness</h3>
-            <app-donut-chart [segments]="vexSegments" centerLabel="Total" />
+            @if (stats.total_vex_statements > 0) {
+              <app-donut-chart [segments]="vexSegments" centerLabel="Total" />
+            } @else {
+              <div class="empty-vex">
+                <span class="empty-vex-icon">📄</span>
+                <p class="empty-vex-title">No VEX Data</p>
+                <p class="empty-vex-hint">Add <code>.openvex.json</code> files to suppress non-applicable vulnerabilities.</p>
+              </div>
+            }
           </div>
         </div>
 
@@ -161,6 +174,12 @@ import { HorizontalBarChartComponent, BarItem } from '../../shared/charts/horizo
     .warning-text a { color: var(--accent); font-weight: 600; margin-left: 8px; }
     .warning-text a:hover { text-decoration: underline; }
 
+    .empty-vex { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 32px 16px; text-align: center; }
+    .empty-vex-icon { font-size: 2rem; opacity: 0.5; }
+    .empty-vex-title { font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin: 0; }
+    .empty-vex-hint { font-size: 0.72rem; color: var(--text-muted); margin: 0; line-height: 1.5; }
+    .empty-vex-hint code { background: var(--border); padding: 1px 5px; border-radius: 3px; font-size: 0.7rem; }
+
     .loading-state { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 80px 0; color: var(--text-muted); }
     .spinner {
       width: 28px; height: 28px; border: 2px solid #e5e7eb; border-top-color: var(--accent);
@@ -205,10 +224,12 @@ export class DashboardComponent implements OnInit {
     ];
     this.licenseBars = [...this.licenseSegments];
 
-    this.vexSegments = [
-      { label: 'Effective', value: s.effective_vulnerabilities, color: '#E8871E' },
-      { label: 'Suppressed', value: s.suppressed_by_vex, color: '#0D6B5E' },
-    ];
+    this.vexSegments = s.total_vex_statements > 0
+      ? [
+          { label: 'Effective', value: s.effective_vulnerabilities, color: '#E8871E' },
+          { label: 'Suppressed', value: s.suppressed_by_vex, color: '#0D6B5E' },
+        ]
+      : [];
   }
 }
 
