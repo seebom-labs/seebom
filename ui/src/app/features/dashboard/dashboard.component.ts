@@ -94,7 +94,7 @@ import { HorizontalBarChartComponent, BarItem } from '../../shared/charts/horizo
         <div class="quick-links">
           <a routerLink="/sboms" class="quick-link">Browse SBOMs <span class="arrow">→</span></a>
           <a routerLink="/vulnerabilities" class="quick-link">View Vulnerabilities <span class="arrow">→</span></a>
-          <a routerLink="/license-violations" class="quick-link">License Violations <span class="arrow">→</span></a>
+          <a routerLink="/license-compliance" class="quick-link">License Compliance <span class="arrow">→</span></a>
           <a routerLink="/cve-impact" class="quick-link">CVE Impact Search <span class="arrow">→</span></a>
         </div>
       } @else {

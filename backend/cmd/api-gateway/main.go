@@ -159,8 +159,8 @@ func main() {
 		writeJSON(w, http.StatusOK, licenses)
 	})
 
-	// Projects with license violations (filtered by exceptions).
-	mux.HandleFunc("GET /api/v1/projects/license-violations", func(w http.ResponseWriter, r *http.Request) {
+	// Projects with non-compliant licenses (filtered by exceptions).
+	mux.HandleFunc("GET /api/v1/projects/license-compliance", func(w http.ResponseWriter, r *http.Request) {
 		// Load current exceptions for filtering (try config path, then SBOM dir).
 		excIdx, _ := license.LoadExceptionsWithFallback(exceptionsPath, sbomDirExceptionsPath)
 		violations, err := chClient.QueryProjectsWithLicenseViolations(r.Context(), excIdx)

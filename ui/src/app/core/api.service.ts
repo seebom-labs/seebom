@@ -75,7 +75,7 @@ export class ApiService {
   }
 
   getProjectsWithLicenseViolations(): Observable<ProjectLicenseViolation[]> {
-    return this.http.get<ProjectLicenseViolation[]>(`${this.baseUrl}/projects/license-violations`);
+    return this.http.get<ProjectLicenseViolation[]>(`${this.baseUrl}/projects/license-compliance`);
   }
 
   getDependencyStats(limit = 50): Observable<DependencyStatsResponse> {

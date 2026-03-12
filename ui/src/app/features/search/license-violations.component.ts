@@ -6,7 +6,7 @@ import { ApiService } from '../../core/api.service';
 import { ProjectLicenseViolation, LicenseExceptionsFile } from '../../core/api.models';
 import { forkJoin } from 'rxjs';
 
-type Tab = 'violations' | 'exceptions';
+type Tab = 'non-compliant' | 'exceptions';
 
 @Component({
   selector: 'app-license-violations',
@@ -16,19 +16,19 @@ type Tab = 'violations' | 'exceptions';
   template: `
     <div class="violations-page">
       <h1>License Compliance</h1>
-      <p class="subtitle">Violations filtered by configured exceptions. Exceptions are managed via <code>license-exceptions.json</code>.</p>
+      <p class="subtitle">Non-compliant licenses filtered by configured exceptions. Exceptions are managed via <code>license-exceptions.json</code>.</p>
 
       <div class="tabs">
-        <button [class.active]="activeTab === 'violations'" (click)="activeTab = 'violations'">
-          Violations ({{ violations.length }})
+        <button [class.active]="activeTab === 'non-compliant'" (click)="activeTab = 'non-compliant'">
+          Non-Compliant ({{ violations.length }})
         </button>
         <button [class.active]="activeTab === 'exceptions'" (click)="activeTab = 'exceptions'">
           Active Exceptions ({{ totalExceptions }})
         </button>
       </div>
 
-      <!-- Violations Tab -->
-      <div *ngIf="activeTab === 'violations'" class="tab-content">
+      <!-- Non-Compliant Tab -->
+      <div *ngIf="activeTab === 'non-compliant'" class="tab-content">
         <cdk-virtual-scroll-viewport itemSize="80" class="viewport">
           <div *cdkVirtualFor="let v of violations; trackBy: trackByViolation" class="violation-card">
             <div class="project-header">
@@ -47,7 +47,7 @@ type Tab = 'violations' | 'exceptions';
           </div>
         </cdk-virtual-scroll-viewport>
         <p *ngIf="loaded && violations.length === 0" class="empty">
-          No license violations found. All violations are covered by exceptions.
+          No non-compliant licenses found. All items are covered by exceptions.
         </p>
       </div>
 
@@ -90,7 +90,7 @@ type Tab = 'violations' | 'exceptions';
         </div>
 
         <p *ngIf="totalExceptions === 0" class="empty-hint">
-          No exceptions configured. Add entries to <code>license-exceptions.json</code> to suppress known violations.
+          No exceptions configured. Add entries to <code>license-exceptions.json</code> to suppress known non-compliant licenses.
         </p>
       </div>
     </div>
@@ -159,7 +159,7 @@ export class LicenseViolationsComponent implements OnInit {
     version: '1.0.0', lastUpdated: '', blanketExceptions: [], exceptions: [],
   };
   loaded = false;
-  activeTab: Tab = 'violations';
+  activeTab: Tab = 'non-compliant';
 
   constructor(
     private readonly api: ApiService,

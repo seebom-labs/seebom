@@ -73,7 +73,7 @@ interface GroupedProject {
               <span class="stat">{{ item.package_count }} <small>usages</small></span>
               <span class="stat">{{ item.sbom_count }} <small>{{ item.sbom_count === 1 ? 'project' : 'projects' }}</small></span>
               <span class="stat warn" *ngIf="item.non_compliant_packages?.length && item.category !== 'permissive' && !item.exempted_packages?.length">
-                {{ item.non_compliant_packages!.length }} <small>violations</small>
+                {{ item.non_compliant_packages!.length }} <small>non-compliant</small>
               </span>
               <span class="stat ok" *ngIf="item.exempted_packages?.length">
                 {{ item.exempted_packages!.length }} <small>exempted</small>

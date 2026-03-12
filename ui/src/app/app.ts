@@ -14,7 +14,7 @@ import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
         <a routerLink="/vulnerabilities" routerLinkActive="active">Vulnerabilities</a>
         <a routerLink="/cve-impact" routerLinkActive="active">CVE Impact</a>
         <a routerLink="/licenses" routerLinkActive="active">Licenses</a>
-        <a routerLink="/license-violations" routerLinkActive="active">Violations</a>
+        <a routerLink="/license-compliance" routerLinkActive="active">Compliance</a>
         <a routerLink="/dependencies" routerLinkActive="active">Dependencies</a>
         <a routerLink="/vex" routerLinkActive="active">VEX</a>
       </div>

@@ -36,7 +36,7 @@ export const routes: Routes = [
       ),
   },
   {
-    path: 'license-violations',
+    path: 'license-compliance',
     loadComponent: () =>
       import('./features/search/license-violations.component').then(
         (m) => m.LicenseViolationsComponent

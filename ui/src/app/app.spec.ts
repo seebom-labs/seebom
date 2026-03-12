@@ -33,7 +33,7 @@ describe('App', () => {
     expect(links[2].textContent).toContain('Vulnerabilities');
     expect(links[3].textContent).toContain('CVE Impact');
     expect(links[4].textContent).toContain('Licenses');
-    expect(links[5].textContent).toContain('Violations');
+    expect(links[5].textContent).toContain('Compliance');
     expect(links[6].textContent).toContain('Dependencies');
     expect(links[7].textContent).toContain('VEX');
   });

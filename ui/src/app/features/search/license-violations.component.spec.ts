@@ -29,10 +29,10 @@ describe('LicenseViolationsComponent', () => {
     expect(compiled.querySelector('h1')?.textContent).toContain('License Compliance');
   });
 
-  it('should default to violations tab', () => {
+  it('should default to non-compliant tab', () => {
     const fixture = TestBed.createComponent(LicenseViolationsComponent);
     const component = fixture.componentInstance;
-    expect(component.activeTab).toBe('violations');
+    expect(component.activeTab).toBe('non-compliant');
   });
 });
 

@@ -167,12 +167,12 @@ describe('ApiService', () => {
     req.flush([]);
   });
 
-  it('should fetch projects with license violations', () => {
+  it('should fetch projects with license compliance issues', () => {
     service.getProjectsWithLicenseViolations().subscribe((violations) => {
       expect(violations).toEqual([]);
     });
 
-    const req = httpMock.expectOne('/api/v1/projects/license-violations');
+    const req = httpMock.expectOne('/api/v1/projects/license-compliance');
     expect(req.request.method).toBe('GET');
     req.flush([]);
   });
