@@ -7,6 +7,11 @@ metadata:
     app.kubernetes.io/name: seebom
     app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
+  defaults:
+    templates:
+      podTemplate: pod-template
+      dataVolumeClaimTemplate: data-volume-template
+      logVolumeClaimTemplate: log-volume-template
   configuration:
     clusters:
       - name: {{ .Values.clickhouse.cluster.name }}

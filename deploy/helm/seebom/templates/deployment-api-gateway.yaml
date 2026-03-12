@@ -29,8 +29,18 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ .Release.Name }}-config
+            {{- if or .Values.clickhouse.password .Values.github.token }}
             - secretRef:
                 name: {{ .Release.Name }}-secret
+            {{- end }}
+          {{- if .Values.clickhouse.userPasswordSecret.enabled }}
+          env:
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.clickhouse.userPasswordSecret.secretName }}
+                  key: {{ .Values.clickhouse.userPasswordSecret.key }}
+          {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz
