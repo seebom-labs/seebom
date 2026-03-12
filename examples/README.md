@@ -41,7 +41,7 @@ vi my-values.yaml
 
 # 2. Install via Helm
 helm install seebom oci://ghcr.io/seebom-labs/seebom/charts/seebom \
-  --version 0.1.2 \
+  --version 0.1.3 \
   -f my-values.yaml
 ```
 

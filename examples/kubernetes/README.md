@@ -32,7 +32,7 @@ helm install seebom deploy/helm/seebom/ \
 
 # Or from the OCI registry:
 helm install seebom oci://ghcr.io/seebom-labs/seebom/charts/seebom \
-  --version 0.1.2 -n seebom -f my-values.yaml
+  --version 0.1.3 -n seebom -f my-values.yaml
 ```
 
 ## Values Files
@@ -70,7 +70,7 @@ sbomSource:
   storageSize: 20Gi        # must be large enough for the full repo
 ```
 
-**Advantages:** Works with any repo size. Single clone, no sidecar overhead.
+**Advantages:** Works with any repo size. Single clone, no sidecar overhead. All pods are automatically co-scheduled on the same node via pod affinity (required for RWO volumes on multi-node clusters).
 
 **Refreshing:** Delete the seed job and re-run Helm upgrade:
 ```bash

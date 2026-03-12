@@ -16,8 +16,21 @@ spec:
           labels:
             app.kubernetes.io/name: seebom
             app.kubernetes.io/component: ingestion-watcher
+            {{- if not .Values.gitSync.enabled }}
+            seebom.io/sbom-volume: "true"
+            {{- end }}
         spec:
           restartPolicy: OnFailure
+          {{- if not .Values.gitSync.enabled }}
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchExpressions:
+                      - key: seebom.io/sbom-volume
+                        operator: Exists
+                  topologyKey: kubernetes.io/hostname
+          {{- end }}
           {{- if .Values.gitSync.enabled }}
           initContainers:
             - name: git-sync

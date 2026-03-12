@@ -17,7 +17,20 @@ spec:
       labels:
         app.kubernetes.io/name: seebom
         app.kubernetes.io/component: api-gateway
+        {{- if not .Values.gitSync.enabled }}
+        seebom.io/sbom-volume: "true"
+        {{- end }}
     spec:
+      {{- if not .Values.gitSync.enabled }}
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: seebom.io/sbom-volume
+                    operator: Exists
+              topologyKey: kubernetes.io/hostname
+      {{- end }}
       containers:
         - name: api-gateway
           image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}/api-gateway:{{ .Values.image.tag }}"
