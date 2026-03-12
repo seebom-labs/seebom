@@ -15,6 +15,7 @@ spec:
       labels:
         app.kubernetes.io/name: seebom
         app.kubernetes.io/component: seed-sboms
+        seebom.io/sbom-volume: "true"
     spec:
       restartPolicy: OnFailure
       containers:

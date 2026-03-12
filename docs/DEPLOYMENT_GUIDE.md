@@ -1,6 +1,6 @@
 # SeeBOM – Kubernetes Deployment Guide
 
-> **Updated:** 2026-03-11
+> **Updated:** 2026-03-12
 
 ## Prerequisites
 
@@ -103,6 +103,14 @@ The Ingestion Watcher scans the SBOM directory **recursively** for:
 Files are **deduplicated by SHA256 hash** — uploading the same file twice will not create duplicates.
 
 > **Note:** VEX files should be placed alongside SBOM files in the same directory. They are never truncated by `SBOM_LIMIT`.
+
+### Volume Scheduling (multi-node clusters)
+
+When using a PVC (`gitSync.enabled: false`), the SBOM volume is `ReadWriteOnce` (RWO) — it can only be mounted on a single node. The Helm chart automatically adds **pod affinity** (`seebom.io/sbom-volume` label) to all workloads that mount this PVC (Parsing Workers, API Gateway, Ingestion Watcher, Seed Job), ensuring they are scheduled on the same node.
+
+This is transparent and requires no manual configuration. If you need to spread pods across nodes, switch to `ReadWriteMany` (RWX) storage and remove the affinity by setting `gitSync.enabled: true` with an `emptyDir` approach.
+
+> **Note:** The directory scanner automatically skips `lost+found` (common on ext4-formatted block volumes), `.git`, and other hidden directories. No manual cleanup of the PVC is needed.
 
 ---
 

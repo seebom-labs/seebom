@@ -4,7 +4,7 @@
 image:
   registry: ghcr.io
   repository: seebom-labs/seebom
-  tag: "0.1.2"
+  tag: "0.1.3"
   pullPolicy: IfNotPresent
 
 # GitHub API token for license resolution (optional, increases rate limit from 60 to 5000 req/h)

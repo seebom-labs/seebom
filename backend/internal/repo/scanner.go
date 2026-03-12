@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,10 +36,25 @@ func (s *Scanner) Scan() ([]FileInfo, error) {
 
 	err := filepath.Walk(s.rootDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return fmt.Errorf("error walking path %s: %w", path, err)
+			// If the root directory itself is unreadable, fail immediately.
+			if path == s.rootDir {
+				return fmt.Errorf("error walking path %s: %w", path, err)
+			}
+			// Permission denied or unreadable child entry (e.g. lost+found on ext4).
+			// Skip the directory/file and continue scanning.
+			log.Printf("Skipping unreadable path %s: %v", path, err)
+			if info != nil && info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 
 		if info.IsDir() {
+			// Skip hidden directories (.git, .cache, etc.) and lost+found.
+			name := info.Name()
+			if name == "lost+found" || name == ".git" || (strings.HasPrefix(name, ".") && name != ".") {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 
