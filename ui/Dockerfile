@@ -20,6 +20,9 @@ COPY nginx.conf /etc/nginx/conf.d/seebom.conf
 # Copy built Angular assets.
 COPY --from=builder /app/dist/ui/browser /usr/share/nginx/html
 
+# Create an empty custom-theme.css fallback (overridable via volume mount).
+RUN touch /usr/share/nginx/html/custom-theme.css
+
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 

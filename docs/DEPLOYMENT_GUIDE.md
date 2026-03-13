@@ -245,7 +245,75 @@ See `ui/src/assets/custom-theme.example.css` for all available variables.
 
 ---
 
-## 5. Full Deployment Example
+## 5. Site Configuration – Customising UI Texts
+
+All UI text content — brand name, page title, dashboard title/subtitle, description banner, and disclaimer — can be overridden **without rebuilding Angular** via a JSON config file (`ui-config.json`).
+
+The Angular app loads `/ui-config.json` at startup. Missing keys gracefully fall back to the built-in SeeBOM defaults.
+
+### Enable the site config ConfigMap
+
+```yaml
+# values-production.yaml
+ui:
+  siteConfig:
+    enabled: true
+    content:
+      brandName: "My Platform"
+      pageTitle: "My Platform"
+      dashboard:
+        title: "Overview"
+        subtitle: "Software Supply Chain Governance"
+        description: "<strong>Welcome</strong> to our internal SBOM governance dashboard."
+        disclaimer: "Internal use only. Data is provided as-is."
+      footer:
+        enabled: true
+        text: "© 2026 My Company"
+```
+
+### Configurable fields
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `brandName` | string | `SeeBOM` | Navbar brand text (top left) |
+| `pageTitle` | string | `SeeBOM` | Browser tab title (`<title>`) |
+| `dashboard.title` | string | `Dashboard` | Dashboard page heading |
+| `dashboard.subtitle` | string | `Software Bill of Materials — Governance Overview` | Dashboard subheading |
+| `dashboard.description` | HTML string | *(SeeBOM Labs description)* | Description banner on dashboard. Supports HTML (links, bold, etc.) |
+| `dashboard.disclaimer` | HTML string | *(default disclaimer)* | Disclaimer text at bottom of dashboard. Supports HTML. |
+| `footer.enabled` | boolean | `false` | Show a footer bar below the main content |
+| `footer.text` | string | `""` | Footer text content |
+
+All fields are **optional**. Omitted keys use the built-in defaults.
+
+### Apply changes
+
+After editing the ConfigMap, restart the UI deployment:
+
+```bash
+kubectl rollout restart deployment seebom-ui
+```
+
+### Local development (Docker Compose)
+
+Edit the default config file directly:
+
+```bash
+vim ui/public/ui-config.json
+docker compose up -d --force-recreate ui
+```
+
+Or point to a custom file via the `UI_CONFIG` environment variable:
+
+```bash
+UI_CONFIG=./my-ui-config.json docker compose up -d --force-recreate ui
+```
+
+> **Note:** The config file is served with `Cache-Control: no-cache` by nginx, so changes take effect on the next browser reload without clearing caches.
+
+---
+
+## 6. Full Deployment Example
 
 ```bash
 # 1. Install the Helm chart
@@ -257,7 +325,8 @@ helm install seebom ./deploy/helm/seebom \
   --set gitSync.repo=https://github.com/your-org/sbom-repo.git \
   --set parsingWorker.replicas=10 \
   --set parsingWorker.skipOSV=false \
-  --set ui.customTheme.enabled=true
+  --set ui.customTheme.enabled=true \
+  --set ui.siteConfig.enabled=true
 
 # 2. Override license exceptions from a local file
 kubectl create configmap seebom-license-exceptions \
@@ -283,7 +352,7 @@ kubectl create job --from=cronjob/seebom-ingestion-watcher seebom-initial-ingest
 
 ---
 
-## 6. Verifying the Deployment
+## 7. Verifying the Deployment
 
 ```bash
 # Check all pods are running
@@ -304,7 +373,7 @@ kubectl exec -it $(kubectl get pod -l app.kubernetes.io/component=api-gateway -o
 
 ---
 
-## 7. Local Development
+## 8. Local Development
 
 Copy `.env.example` to `.env` and adjust:
 
@@ -320,6 +389,7 @@ cp .env.example .env
 | `WORKER_BATCH_SIZE` | `50` | Jobs claimed per polling cycle per worker |
 | `SKIP_OSV` | `false` | Skip OSV vulnerability API calls. Set `true` for fast initial bulk load. |
 | `CUSTOM_THEME` | (example file) | Path to a custom CSS theme file for the UI |
+| `UI_CONFIG` | `./ui/public/ui-config.json` | Path to a JSON file with UI text overrides (brand, titles, disclaimer) |
 
 ### Useful Make targets
 
@@ -345,6 +415,7 @@ cp .env.example .env
 | **License Exceptions** | `seebom-license-exceptions` ConfigMap | `kubectl edit configmap` → restart API |
 | **License Policy** | `seebom-license-policy` ConfigMap | `kubectl edit configmap` → restart API + Workers |
 | **Custom Theme** | `seebom-custom-theme` ConfigMap | `kubectl create configmap` → restart UI |
+| **Site Config** | `seebom-ui-config` ConfigMap | Helm values `ui.siteConfig.content.*` → restart UI |
 | **Dark Mode** | Built-in toggle (navbar) | User preference, stored in browser localStorage |
 | **ClickHouse password** | `seebom-secret` Secret | `kubectl edit secret` |
 

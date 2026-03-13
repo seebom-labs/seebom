@@ -5,7 +5,7 @@
 .PHONY: ingest worker api
 .PHONY: images images-push
 .PHONY: sync-labels
-.PHONY: kind-up kind-down kind-reingest kind-build kind-deploy
+.PHONY: kind-up kind-down kind-reingest kind-build kind-deploy kind-stop kind-start kind-status
 
 SHELL := /bin/bash
 REGISTRY ?= ghcr.io
@@ -166,8 +166,31 @@ sync-labels: ## Sync GitHub labels from .github/labels.yml (requires gh + yq)
 kind-up: ## Deploy SeeBOM to a local Kind cluster (see local/secrets.env)
 	./local/setup.sh
 
-kind-down: ## Destroy the local Kind cluster
+kind-down: ## Destroy the local Kind cluster (deletes everything)
 	./local/teardown.sh
+
+kind-stop: ## Stop the Kind cluster without losing data (docker stop)
+	@echo "⏸️  Stopping Kind cluster 'seebom'..."
+	@docker stop seebom-control-plane 2>/dev/null || echo "Cluster not running"
+	@echo "✅ Cluster stopped. Data and volumes preserved."
+	@echo "   Resume with: make kind-start"
+
+kind-start: ## Resume a stopped Kind cluster (docker start)
+	@echo "▶️  Starting Kind cluster 'seebom'..."
+	@docker start seebom-control-plane 2>/dev/null || { echo "❌ No stopped cluster found. Run: make kind-up"; exit 1; }
+	@echo "⏳ Waiting for API server..."
+	@until kubectl --context kind-seebom cluster-info >/dev/null 2>&1; do sleep 2; done
+	@echo "✅ Cluster running. All pods and volumes intact."
+	@echo "   UI:   http://localhost:8090"
+	@echo "   API:  http://localhost:8080/healthz"
+	@echo "   Pods: kubectl get pods -n seebom"
+
+kind-status: ## Show Kind cluster and pod status
+	@echo "=== Kind Cluster ==="
+	@docker ps -a --filter "name=seebom-control-plane" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || echo "No Kind cluster found"
+	@echo ""
+	@echo "=== Pods ==="
+	@kubectl get pods -n seebom 2>/dev/null || echo "(cluster not reachable)"
 
 kind-reingest: ## Re-ingest all SBOMs in Kind (no re-download, truncates data + re-queues)
 	@echo "🗑️  Truncating data tables..."

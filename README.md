@@ -58,6 +58,8 @@ cp .env.example .env
 | `SKIP_OSV` | `false` | Skip OSV vulnerability API calls. Set `true` for fast initial bulk load (licenses only), then re-run with `false`. |
 | `SKIP_GITHUB_RESOLVE` | `false` | Skip GitHub license resolution for packages with `NOASSERTION`/empty licenses. |
 | `GITHUB_TOKEN` | *(empty)* | GitHub personal access token for license resolution. Increases rate limit from 60 to 5000 req/h. No scopes needed. |
+| `CUSTOM_THEME` | (example file) | Path to a custom CSS theme file for the UI. See "Custom Theme" section. |
+| `UI_CONFIG` | `./ui/public/ui-config.json` | Path to a JSON file with UI text overrides (brand name, dashboard texts, disclaimer). See "Site Configuration" section. |
 
 **After changing `.env`:**
 
@@ -122,6 +124,60 @@ kubectl rollout restart deployment seebom-ui
 ```
 
 See `ui/src/assets/custom-theme.example.css` for all available variables.
+
+### Site Configuration (Texts & Branding)
+
+All UI text content (brand name, page title, dashboard description, disclaimer, etc.) can be customised **without rebuilding** Angular via a `ui-config.json` file.
+
+**Local (Docker Compose):** Edit the default file directly or point to your own:
+
+```bash
+# Option 1: Edit the built-in default
+vim ui/public/ui-config.json
+
+# Option 2: Use a custom file via .env
+UI_CONFIG=./my-ui-config.json
+docker compose up -d --force-recreate ui
+```
+
+**Example `ui-config.json`:**
+
+```json
+{
+  "brandName": "My SBOM Platform",
+  "pageTitle": "My SBOM Platform",
+  "dashboard": {
+    "title": "Overview",
+    "subtitle": "Software Supply Chain Governance",
+    "description": "<strong>Welcome</strong> to our internal SBOM governance platform.",
+    "disclaimer": "Internal use only. Data sourced from OSV and GitHub."
+  },
+  "footer": {
+    "enabled": true,
+    "text": "© 2026 My Company"
+  }
+}
+```
+
+All fields are optional — any missing key falls back to the built-in SeeBOM default. HTML is supported in `description` and `disclaimer`.
+
+**Kubernetes:** Enable the site config in Helm values:
+
+```yaml
+ui:
+  siteConfig:
+    enabled: true
+    content:
+      brandName: "My SBOM Platform"
+      pageTitle: "My SBOM Platform"
+      dashboard:
+        title: "Overview"
+        subtitle: "Software Supply Chain Governance"
+        description: "<strong>Welcome</strong> to our SBOM platform."
+        disclaimer: "Internal use only."
+```
+
+Changes take effect after a pod restart (`kubectl rollout restart deployment seebom-ui`). No rebuild needed.
 
 ```bash
 # After editing config files:
@@ -212,7 +268,7 @@ sboms/*.spdx.json + *.openvex.json
              │
              ▼
 ┌─────────────────────────┐
-│   API Gateway           │  17 REST endpoints, stateless
+│   API Gateway           │  16 REST endpoints, stateless
 │   (Go binary)           │
 └────────────┬────────────┘
              │
@@ -248,7 +304,10 @@ See [docs/TESTING.md](docs/TESTING.md) for writing and running tests.
 | `make migrate` | Run all pending database migrations |
 | **Kind (Local Kubernetes)** | |
 | `make kind-up` | Create Kind cluster and deploy SeeBOM via Helm |
-| `make kind-down` | Destroy the Kind cluster |
+| `make kind-down` | Destroy the Kind cluster (deletes everything) |
+| `make kind-stop` | Stop the Kind cluster without losing data (preserves volumes) |
+| `make kind-start` | Resume a stopped Kind cluster (all pods & data intact) |
+| `make kind-status` | Show Kind cluster and pod status |
 | `make kind-build` | Build all container images and load them into Kind |
 | `make kind-deploy` | Build images, Helm upgrade, and restart pods |
 | `make kind-reingest` | Re-ingest all SBOMs (truncate data, re-queue, no re-download) |
@@ -286,7 +345,7 @@ See [docs/TESTING.md](docs/TESTING.md) for writing and running tests.
 | GET | `/api/v1/vulnerabilities?page=&vex_filter=` | Paginated vulnerabilities (optional: `vex_filter=effective`) |
 | GET | `/api/v1/vulnerabilities/{id}/affected-projects` | All projects affected by a CVE |
 | GET | `/api/v1/licenses/compliance` | Global license compliance overview |
-| GET | `/api/v1/projects/license-violations` | Projects with license violations (filtered by exceptions) |
+| GET | `/api/v1/projects/license-compliance` | Projects with license violations (filtered by exceptions) |
 | GET | `/api/v1/license-exceptions` | Active license exceptions (read-only, from config file) |
 | GET | `/api/v1/license-policy` | Active license classification policy (permissive/copyleft lists) |
 | GET | `/api/v1/vex/statements?page=&page_size=` | Paginated VEX statements |
@@ -357,7 +416,7 @@ kubectl edit configmap seebom-license-policy -n seebom
 
 | Layer | Technology |
 |-------|-----------|
-| Backend | Go 1.24, net/http (stdlib) |
+| Backend | Go 1.25, net/http (stdlib) |
 | Database | ClickHouse (MergeTree family) |
 | Frontend | Angular 19, CDK Virtual Scrolling |
 | Vuln Scanning | OSV.dev API |

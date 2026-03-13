@@ -126,6 +126,8 @@ ui:
     limits:   { cpu: 200m, memory: 128Mi }
   customTheme:
     enabled: false
+  siteConfig:
+    enabled: false
 
 # ─── CVE Refresher ──────────────────────────────────────────────────────────
 cveRefresher:

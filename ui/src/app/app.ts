@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { SiteConfigService } from './core/site-config.service';
 
 @Component({
   selector: 'app-root',
@@ -7,7 +8,7 @@ import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
   imports: [RouterOutlet, RouterLink, RouterLinkActive],
   template: `
     <nav class="navbar">
-      <a class="brand" routerLink="/">SeeBOM</a>
+      <a class="brand" routerLink="/">{{ siteConfig.brandName }}</a>
       <div class="nav-links">
         <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">Dashboard</a>
         <a routerLink="/sboms" routerLinkActive="active">SBOMs</a>
@@ -78,6 +79,8 @@ import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 })
 export class App implements OnInit {
   dark = false;
+
+  constructor(readonly siteConfig: SiteConfigService) {}
 
   ngOnInit(): void {
     const saved = localStorage.getItem('seebom-theme');

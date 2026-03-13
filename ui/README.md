@@ -57,3 +57,35 @@ Angular CLI does not come with an end-to-end testing framework by default. You c
 ## Additional Resources
 
 For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+
+## Customisation
+
+### Custom Theme (CSS)
+
+Override any CSS variable without rebuilding. Mount a `custom-theme.css` into the nginx webroot:
+
+```bash
+CUSTOM_THEME=./my-theme.css docker compose up -d --force-recreate ui
+```
+
+See `src/assets/custom-theme.example.css` for all available variables.
+
+### Site Configuration (Texts & Branding)
+
+All UI text content is configurable via `public/ui-config.json` (loaded at runtime, no rebuild needed):
+
+| Key | Description |
+|-----|-------------|
+| `brandName` | Navbar brand text |
+| `pageTitle` | Browser tab title |
+| `dashboard.title` | Dashboard heading |
+| `dashboard.subtitle` | Dashboard subheading |
+| `dashboard.description` | Description banner (HTML supported) |
+| `dashboard.disclaimer` | Disclaimer text (HTML supported) |
+| `footer.enabled` | Show/hide footer |
+| `footer.text` | Footer text content |
+
+All fields are optional — missing keys fall back to built-in defaults.
+
+For Docker Compose, use the `UI_CONFIG` env variable to mount a custom file. For Kubernetes, enable `ui.siteConfig` in Helm values.
+

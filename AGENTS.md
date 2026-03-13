@@ -32,7 +32,7 @@ Data layer (`pkg/`):
 - **Backend & Workers:** Go (Golang)
 - **Database:** ClickHouse (managed via the official ClickHouse Kubernetes Operator)
 - **Frontend:** Angular (TypeScript, standalone components, OnPush change detection)
-- **Infrastructure:** Kubernetes (Standard Helm Chart, 18 templates)
+- **Infrastructure:** Kubernetes (Standard Helm Chart, 19 templates)
 - **Container Registry:** GitHub Container Registry (ghcr.io/seebom-labs/seebom/*)
 - **Go Module Path:** `github.com/seebom-labs/seebom/backend`
 
@@ -77,6 +77,9 @@ make ui-dev          # Start Angular dev server (hot-reload, proxies to localhos
 ```
 make kind-up         # Deploy SeeBOM to a local Kind cluster
 make kind-down       # Destroy the local Kind cluster
+make kind-stop       # Stop the Kind cluster without losing data (docker stop)
+make kind-start      # Resume a stopped Kind cluster (all data intact)
+make kind-status     # Show Kind cluster and pod status
 make kind-build      # Build dev images and load into Kind
 make kind-deploy     # Build, load, and upgrade Helm release
 make kind-reingest   # Truncate data and re-trigger ingestion in Kind
@@ -120,6 +123,7 @@ Frontend Test:   cd ui && npx ng test            # uses Vitest
 - All routes are lazy-loaded standalone components (see `app.routes.ts`). Feature pages: `dashboard`, `sbom-explorer`, `vulnerability`, `search` (CVE impact, license compliance, dependency stats), `license-compliance`, `vex`, `archived-packages`.
 - Shared chart components live in `shared/charts/` (donut chart, horizontal bar chart).
 - UI supports **Dark Mode** (toggle in navbar, persisted to localStorage) and **Custom CSS Theming** (external `custom-theme.css` mountable without rebuild).
+- UI supports **Site Configuration** (`ui-config.json`): brand name, page title, dashboard texts, and disclaimer are configurable without rebuild. Loaded at startup via `APP_INITIALIZER` in `SiteConfigService`. Mount via Docker volume or Kubernetes ConfigMap (`ui.siteConfig` in Helm values).
 - License exemptions are visually distinct: green badge + orange text for exempted copyleft, red for violations.
 - Project grouping with clickable version tags is used in CVE Impact, VEX, and License Overview pages.
 

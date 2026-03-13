@@ -103,6 +103,7 @@ services:
       - "8090:80"
     volumes:
       - ${CUSTOM_THEME:-./ui/src/assets/custom-theme.example.css}:/usr/share/nginx/html/custom-theme.css:ro
+      - ${UI_CONFIG:-./ui/public/ui-config.json}:/usr/share/nginx/html/ui-config.json:ro
     depends_on:
       - api-gateway
 

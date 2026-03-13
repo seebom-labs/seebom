@@ -51,6 +51,12 @@ spec:
               subPath: custom-theme.css
               readOnly: true
             {{- end }}
+            {{- if .Values.ui.siteConfig.enabled }}
+            - name: ui-config
+              mountPath: /usr/share/nginx/html/ui-config.json
+              subPath: ui-config.json
+              readOnly: true
+            {{- end }}
       volumes:
         - name: nginx-config
           configMap:
@@ -59,5 +65,10 @@ spec:
         - name: custom-theme
           configMap:
             name: {{ .Release.Name }}-custom-theme
+        {{- end }}
+        {{- if .Values.ui.siteConfig.enabled }}
+        - name: ui-config
+          configMap:
+            name: {{ .Release.Name }}-ui-config
         {{- end }}
 

@@ -1,0 +1,13 @@
+{{- if .Values.ui.siteConfig.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-ui-config
+  labels:
+    app.kubernetes.io/name: seebom
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  ui-config.json: |-
+    {{ .Values.ui.siteConfig.content | toJson }}
+{{- end }}
+

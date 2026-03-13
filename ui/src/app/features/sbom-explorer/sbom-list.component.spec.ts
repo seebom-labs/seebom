@@ -1,32 +1,31 @@
 import { TestBed } from '@angular/core/testing';
-});
-  });
-    expect(compiled.querySelector('cdk-virtual-scroll-viewport')).toBeTruthy();
-    const compiled = fixture.nativeElement as HTMLElement;
-    fixture.detectChanges();
-    const fixture = TestBed.createComponent(SbomListComponent);
-  it('should have a virtual scroll viewport', () => {
-
-  });
-    expect(component).toBeTruthy();
-    const component = fixture.componentInstance;
-    const fixture = TestBed.createComponent(SbomListComponent);
-  it('should create', () => {
-
-  });
-    }).compileComponents();
-      ],
-        provideRouter([]),
-        provideHttpClientTesting(),
-        provideHttpClient(),
-      providers: [
-      imports: [SbomListComponent],
-    await TestBed.configureTestingModule({
-  beforeEach(async () => {
-describe('SbomListComponent', () => {
-
-import { SbomListComponent } from './sbom-list.component';
-import { provideRouter } from '@angular/router';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideRouter } from '@angular/router';
+import { SbomListComponent } from './sbom-list.component';
 
+describe('SbomListComponent', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [SbomListComponent],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+      ],
+    }).compileComponents();
+  });
+
+  it('should create', () => {
+    const fixture = TestBed.createComponent(SbomListComponent);
+    const component = fixture.componentInstance;
+    expect(component).toBeTruthy();
+  });
+
+  it('should have a virtual scroll viewport', () => {
+    const fixture = TestBed.createComponent(SbomListComponent);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('cdk-virtual-scroll-viewport')).toBeTruthy();
+  });
+});

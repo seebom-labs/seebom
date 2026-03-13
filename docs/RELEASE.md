@@ -13,7 +13,7 @@ All container images are published to **GitHub Container Registry (ghcr.io)**:
 |-------|-------------|
 | `ghcr.io/seebom-labs/seebom/ingestion-watcher` | CronJob: scans SBOM/VEX files, enqueues jobs |
 | `ghcr.io/seebom-labs/seebom/parsing-worker` | Stateless worker: parses SBOMs, queries OSV, checks licenses |
-| `ghcr.io/seebom-labs/seebom/api-gateway` | REST API (17 endpoints) |
+| `ghcr.io/seebom-labs/seebom/api-gateway` | REST API (16 endpoints) |
 | `ghcr.io/seebom-labs/seebom/cve-refresher` | CronJob: daily incremental CVE checks against OSV |
 | `ghcr.io/seebom-labs/seebom/ui` | Angular frontend (Nginx) |
 
