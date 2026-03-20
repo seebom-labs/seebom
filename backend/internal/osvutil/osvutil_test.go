@@ -74,11 +74,60 @@ func TestClassifySeverity_CVSS(t *testing.T) {
 			expected: "LOW",
 		},
 		{
-			name: "CVSS vector string (unparseable as float)",
+			name: "CVSS vector string critical (AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H)",
+			entry: osv.VulnEntry{
+				Severity: []osv.Severity{{Type: "CVSS_V3", Score: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}},
+			},
+			expected: "CRITICAL",
+		},
+		{
+			name: "CVSS vector string high (AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H)",
 			entry: osv.VulnEntry{
 				Severity: []osv.Severity{{Type: "CVSS_V3", Score: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"}},
 			},
-			expected: "MEDIUM", // defaults to 5.0 → MEDIUM
+			expected: "HIGH",
+		},
+		{
+			name: "CVSS vector string medium (AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:L/A:N)",
+			entry: osv.VulnEntry{
+				Severity: []osv.Severity{{Type: "CVSS_V3", Score: "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:L/A:N"}},
+			},
+			expected: "MEDIUM",
+		},
+		{
+			name: "CVSS vector string low (AV:P/AC:H/PR:H/UI:R/S:U/C:L/I:N/A:N)",
+			entry: osv.VulnEntry{
+				Severity: []osv.Severity{{Type: "CVSS_V3", Score: "CVSS:3.1/AV:P/AC:H/PR:H/UI:R/S:U/C:L/I:N/A:N"}},
+			},
+			expected: "LOW",
+		},
+		{
+			name: "database_specific severity fallback - HIGH",
+			entry: osv.VulnEntry{
+				DatabaseSpecific: map[string]interface{}{
+					"severity": "HIGH",
+				},
+			},
+			expected: "HIGH",
+		},
+		{
+			name: "database_specific severity fallback - CRITICAL",
+			entry: osv.VulnEntry{
+				DatabaseSpecific: map[string]interface{}{
+					"severity": "CRITICAL",
+				},
+			},
+			expected: "CRITICAL",
+		},
+		{
+			name: "CVSS_V3 takes precedence over database_specific",
+			entry: osv.VulnEntry{
+				Severity: []osv.Severity{{Type: "CVSS_V3", Score: "9.8"}},
+				DatabaseSpecific: map[string]interface{}{
+					"severity": "LOW",
+				},
+			},
+			expected: "CRITICAL",
 		},
 	}
 
@@ -101,15 +150,70 @@ func TestParseCVSSScore(t *testing.T) {
 		{"7.5", 7.5},
 		{"0.0", 0.0},
 		{"10.0", 10.0},
-		{"CVSS:3.1/AV:N", 5.0}, // unparseable → default
-		{"", 5.0},              // empty → default
+		{"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", 9.8}, // critical vector
+		{"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H", 7.5}, // high vector
+		{"", -1},        // empty → unparseable
+		{"garbage", -1}, // garbage → unparseable
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			got := ParseCVSSScore(tt.input)
-			if got != tt.expected {
-				t.Errorf("ParseCVSSScore(%q) = %f, want %f", tt.input, got, tt.expected)
+			if tt.expected < 0 {
+				if got >= 0 {
+					t.Errorf("ParseCVSSScore(%q) = %f, want negative (unparseable)", tt.input, got)
+				}
+			} else {
+				// Allow small floating point tolerance.
+				diff := got - tt.expected
+				if diff < -0.1 || diff > 0.1 {
+					t.Errorf("ParseCVSSScore(%q) = %f, want %f", tt.input, got, tt.expected)
+				}
+			}
+		})
+	}
+}
+
+func TestComputeCVSSv3BaseScore(t *testing.T) {
+	tests := []struct {
+		name     string
+		vector   string
+		expected float64
+	}{
+		{
+			name:     "max severity",
+			vector:   "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+			expected: 10.0,
+		},
+		{
+			name:     "typical critical",
+			vector:   "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+			expected: 9.8,
+		},
+		{
+			name:     "all none impact",
+			vector:   "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N",
+			expected: 0.0,
+		},
+		{
+			name:     "malformed vector",
+			vector:   "CVSS:3.1/GARBAGE",
+			expected: -1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := computeCVSSv3BaseScore(tt.vector)
+			if tt.expected < 0 {
+				if got >= 0 {
+					t.Errorf("computeCVSSv3BaseScore(%q) = %f, want negative", tt.vector, got)
+				}
+			} else {
+				diff := got - tt.expected
+				if diff < -0.1 || diff > 0.1 {
+					t.Errorf("computeCVSSv3BaseScore(%q) = %f, want %f", tt.vector, got, tt.expected)
+				}
 			}
 		})
 	}

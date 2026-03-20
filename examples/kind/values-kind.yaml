@@ -47,9 +47,19 @@ clickhouse:
 github:
   token: ""   # injected via --set or K8s Secret
 
-# ─── SBOM Source ─────────────────────────────────────────────────────────────
+# ─── S3 Bucket Ingestion (default, recommended) ─────────────────────────────
+# Ingest SBOMs from S3-compatible buckets (AWS S3, MinIO, GCS).
+# This is the default ingestion method. Works alongside or instead of the PVC.
+s3:
+  # JSON array of bucket configs. Credentials injected via --set or K8s Secret.
+  # buckets: '[{"name":"cncf-subproject-sboms","region":"us-east-1"},{"name":"cncf-project-sboms","region":"us-east-1"}]'
+  buckets: ""
+  accessKey: ""   # injected via --set or K8s Secret
+  secretKey: ""   # injected via --set or K8s Secret
+
+# ─── SBOM Source via PVC (alternative to S3) ─────────────────────────────────
 # Disable git-sync and use a one-shot seed job instead.
-# The seed job clones the CNCF SBOM repo into a PVC.
+# Only needed if S3 is not configured above.
 gitSync:
   enabled: false
 
@@ -92,6 +102,7 @@ parsingWorker:
   replicas: 2
   batchSize: 25
   skipOSV: false
+  skipGitHubResolve: false
   resources:
     requests: { cpu: 100m, memory: 256Mi }
     limits:   { cpu: 500m, memory: 512Mi }
@@ -117,6 +128,8 @@ ui:
     requests: { cpu: 25m, memory: 32Mi }
     limits:   { cpu: 100m, memory: 64Mi }
   customTheme:
+    enabled: false
+  siteConfig:
     enabled: false
 
 cveRefresher:

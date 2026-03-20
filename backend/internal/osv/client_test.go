@@ -50,6 +50,7 @@ func TestQueryBatch_MockServer(t *testing.T) {
 		baseURL:    server.URL,
 		httpClient: server.Client(),
 		limiter:    getGlobalLimiter(),
+		vulnCache:  make(map[string]*VulnEntry),
 	}
 
 	resp, err := client.QueryBatch(context.Background(), []string{"pkg:npm/test@1.0.0"})
@@ -79,6 +80,7 @@ func TestQueryBatch_ServerError(t *testing.T) {
 		baseURL:    server.URL,
 		httpClient: server.Client(),
 		limiter:    getGlobalLimiter(),
+		vulnCache:  make(map[string]*VulnEntry),
 	}
 
 	_, err := client.QueryBatch(context.Background(), []string{"pkg:npm/test@1.0.0"})
@@ -98,6 +100,7 @@ func TestQueryBatch_ContextCancelled(t *testing.T) {
 		baseURL:    server.URL,
 		httpClient: server.Client(),
 		limiter:    getGlobalLimiter(),
+		vulnCache:  make(map[string]*VulnEntry),
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -121,6 +124,7 @@ func TestQueryBatch_NoVulns(t *testing.T) {
 		baseURL:    server.URL,
 		httpClient: server.Client(),
 		limiter:    getGlobalLimiter(),
+		vulnCache:  make(map[string]*VulnEntry),
 	}
 
 	resp, err := client.QueryBatch(context.Background(), []string{"pkg:npm/safe-package@1.0.0"})
@@ -132,5 +136,65 @@ func TestQueryBatch_NoVulns(t *testing.T) {
 	}
 	if len(resp.Results[0].Vulns) != 0 {
 		t.Errorf("expected 0 vulns for safe package, got %d", len(resp.Results[0].Vulns))
+	}
+}
+
+func TestHydrateVulns_CachesPreviousResults(t *testing.T) {
+	// Track how many times each vuln ID is requested.
+	fetchCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fetchCount++
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"id": "GHSA-test-1234",
+			"summary": "Test vuln",
+			"severity": [{"type": "CVSS_V3", "score": "7.5"}],
+			"affected": []
+		}`))
+	}))
+	defer server.Close()
+
+	client := &Client{
+		baseURL:    server.URL,
+		httpClient: server.Client(),
+		limiter:    getGlobalLimiter(),
+		vulnCache:  make(map[string]*VulnEntry),
+	}
+
+	// First call: should fetch from API.
+	result1, err := client.HydrateVulns(context.Background(), []string{"GHSA-test-1234"})
+	if err != nil {
+		t.Fatalf("HydrateVulns() first call error: %v", err)
+	}
+	if _, ok := result1["GHSA-test-1234"]; !ok {
+		t.Fatal("expected GHSA-test-1234 in result")
+	}
+	if fetchCount != 1 {
+		t.Errorf("expected 1 API fetch, got %d", fetchCount)
+	}
+
+	// Second call with same ID: should use cache, no new API call.
+	result2, err := client.HydrateVulns(context.Background(), []string{"GHSA-test-1234"})
+	if err != nil {
+		t.Fatalf("HydrateVulns() second call error: %v", err)
+	}
+	if _, ok := result2["GHSA-test-1234"]; !ok {
+		t.Fatal("expected GHSA-test-1234 in cached result")
+	}
+	if fetchCount != 1 {
+		t.Errorf("expected still 1 API fetch (cached), got %d", fetchCount)
+	}
+
+	// Third call with duplicate IDs: should still use cache.
+	result3, err := client.HydrateVulns(context.Background(), []string{"GHSA-test-1234", "GHSA-test-1234"})
+	if err != nil {
+		t.Fatalf("HydrateVulns() third call error: %v", err)
+	}
+	if len(result3) != 1 {
+		t.Errorf("expected 1 unique result, got %d", len(result3))
+	}
+	if fetchCount != 1 {
+		t.Errorf("expected still 1 API fetch (deduped+cached), got %d", fetchCount)
 	}
 }

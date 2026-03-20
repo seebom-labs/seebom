@@ -546,3 +546,35 @@ func TestSplitLicenses(t *testing.T) {
 		})
 	}
 }
+
+func TestCheck_GoTempNamesFiltered(t *testing.T) {
+	// Go temp directory names like "tmp.ej9m9OiO2V" should be silently skipped
+	// and never appear in non-compliant package lists.
+	names := []string{"tmp.ej9m9OiO2V", "real-pkg", "tmp.AbCdEfGhIj"}
+	licenses := []string{"GPL-3.0-only", "GPL-3.0-only", "NOASSERTION"}
+
+	results := Check(names, licenses)
+
+	byLicense := make(map[string]Result)
+	for _, r := range results {
+		byLicense[r.LicenseID] = r
+	}
+
+	gpl, ok := byLicense["GPL-3.0-only"]
+	if !ok {
+		t.Fatal("expected GPL-3.0-only result")
+	}
+	// Only "real-pkg" should appear; the tmp.* names should be filtered out.
+	if gpl.PackageCount != 1 {
+		t.Errorf("expected 1 GPL package (tmp names skipped), got %d", gpl.PackageCount)
+	}
+	if len(gpl.NonCompliantPackages) != 1 || gpl.NonCompliantPackages[0] != "real-pkg" {
+		t.Errorf("expected [real-pkg] non-compliant, got %v", gpl.NonCompliantPackages)
+	}
+
+	// The NOASSERTION tmp package should be entirely skipped.
+	noassert, ok := byLicense["NOASSERTION"]
+	if ok && noassert.PackageCount > 0 {
+		t.Errorf("expected NOASSERTION tmp package to be filtered, got count=%d", noassert.PackageCount)
+	}
+}

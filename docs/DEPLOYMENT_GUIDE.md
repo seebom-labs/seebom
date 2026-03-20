@@ -1,6 +1,6 @@
 # SeeBOM – Kubernetes Deployment Guide
 
-> **Updated:** 2026-03-12
+> **Updated:** 2026-03-13
 
 ## Prerequisites
 
@@ -13,20 +13,91 @@
 
 ## 1. SBOMs – Getting Data Into the Cluster
 
-SBOMs are loaded from a **PersistentVolumeClaim** (PVC) mounted at `/data/sboms`. There are three ways to populate this PVC. See also [`examples/kubernetes/README.md`](../examples/kubernetes/README.md) for complete Helm value examples.
+SeeBOM supports multiple SBOM ingestion methods. **S3 bucket ingestion** is the default and recommended approach — it requires no PVCs, no volume scheduling, and scales to any number of SBOMs. Volume-based alternatives are available for environments without S3.
 
-### Option A: Seed Job (recommended for large repos)
+### Option A: S3 Buckets (default, recommended)
 
-A Kubernetes Job runs at install time, does a shallow `git clone`, and flat-copies all SBOM files into the PVC. This is the most reliable method for large repos (e.g. `cncf/sbom` at ~14 GB with 6500+ SBOMs).
+Ingest SBOMs directly from S3-compatible buckets (AWS S3, MinIO, GCS). The Ingestion Watcher streams object listings with pagination (no full listing in memory) and the Parsing Workers fetch objects on-demand. No PVCs, git-sync sidecars, or seed jobs required.
+
+**Single public bucket:**
 
 ```yaml
+s3:
+  buckets: '[{"name":"cncf-subproject-sboms","region":"us-east-1"}]'
+```
+
+**Multiple buckets:**
+
+```yaml
+s3:
+  buckets: '[{"name":"cncf-subproject-sboms","region":"us-east-1"},{"name":"cncf-project-sboms","region":"us-east-1"}]'
+```
+
+**Private buckets with credentials:**
+
+```yaml
+s3:
+  buckets: '[{"name":"my-private-bucket","region":"eu-west-1"}]'
+  accessKey: ""   # pass via --set or K8s Secret
+  secretKey: ""   # pass via --set or K8s Secret
+```
+
+```bash
+helm install seebom deploy/helm/seebom/ -n seebom -f my-values.yaml \
+  --set s3.accessKey="AKIA..." \
+  --set s3.secretKey="..."
+```
+
+**Per-bucket credentials** (different keys for different buckets):
+
+```yaml
+s3:
+  buckets: '[{"name":"bucket-a","accessKey":"AKIA_A","secretKey":"..."},{"name":"bucket-b","accessKey":"AKIA_B","secretKey":"..."}]'
+```
+
+**MinIO (local S3-compatible):**
+
+```yaml
+s3:
+  buckets: '[{"name":"sboms","endpoint":"minio.minio.svc:9000","usePathStyle":true,"useSSL":false}]'
+  accessKey: "minioadmin"
+  secretKey: "minioadmin"
+```
+
+**Advantages:**
+- No PVC, no volume scheduling, no pod affinity constraints
+- Streams object listings — handles 100k+ SBOMs without memory issues
+- Jobs are enqueued in batches of 500 for efficient ClickHouse inserts
+- SHA256 deduplication via streaming hash (object is never fully loaded into memory)
+- Workers fetch objects on-demand — no shared filesystem needed
+- Works with any S3-compatible storage (AWS, GCS, MinIO, Ceph, DigitalOcean Spaces)
+- Can run alongside local filesystem ingestion
+
+**Supported file patterns in S3:**
+
+| Pattern | Type |
+|---------|------|
+| `*.spdx.json` | SPDX SBOM |
+| `*_spdx.json` | SPDX SBOM (CNCF naming convention) |
+| `*.openvex.json` | OpenVEX statement |
+| `*.vex.json` | OpenVEX statement |
+
+Nested keys are fully supported (e.g. `k3s-io/helm-controller/0.16.14/k3s-io_helm-controller_0_16_14_spdx.json`).
+
+### Option B: Seed Job (alternative for environments without S3)
+
+A Kubernetes Job runs at install time, does a shallow `git clone`, and flat-copies all SBOM files into a PVC. Suitable when your SBOMs live in a Git repo and S3 is not available.
+
+```yaml
+s3:
+  buckets: ""    # disable S3
+
 gitSync:
   enabled: false
 
 seedJob:
   sbomRepo: "https://github.com/cncf/sbom.git"
   sbomBranch: main
-  # Also download the CNCF license exceptions into the PVC:
   cncfExceptionsURL: "https://raw.githubusercontent.com/cncf/foundation/main/license-exceptions/exceptions.json"
 
 sbomSource:
@@ -41,11 +112,16 @@ kubectl delete job -n seebom -l app.kubernetes.io/component=seed-sboms
 helm upgrade seebom deploy/helm/seebom/ -n seebom -f my-values.yaml
 ```
 
-### Option B: git-sync (for small repos < 1 GB)
+> **Note:** When using a PVC, the SBOM volume is `ReadWriteOnce` (RWO). The Helm chart automatically adds pod affinity to co-schedule all workloads on the same node.
 
-A [git-sync](https://github.com/kubernetes/git-sync) sidecar continuously pulls SBOMs from a Git repo into the PVC. Good for small repos that update frequently.
+### Option C: git-sync (alternative for small repos < 1 GB)
+
+A [git-sync](https://github.com/kubernetes/git-sync) sidecar continuously pulls SBOMs from a Git repo. Only suitable for small repos under ~1 GB.
 
 ```yaml
+s3:
+  buckets: ""    # disable S3
+
 gitSync:
   enabled: true
   repo: "https://github.com/your-org/sbom-repo.git"
@@ -55,62 +131,38 @@ gitSync:
   timeout: 120
 ```
 
-For **private repos**, create a Secret with your deploy key:
+> **⚠️  Limitation:** git-sync struggles with large repos (multi-GB). For repos like `cncf/sbom` (~14 GB), it times out or OOM-kills. Use S3 or the seed job instead.
 
-```bash
-kubectl create secret generic git-sync-credentials \
-  --from-file=ssh-key=/path/to/id_rsa \
-  --from-literal=GIT_SYNC_SSH_KEY_FILE=/etc/git-secret/ssh-key
-```
+### Option D: Pre-populated PVC (manual / CI pipeline)
+
+If your SBOMs are not in S3 or a Git repo:
 
 ```yaml
-gitSync:
-  enabled: true
-  repo: "git@github.com:your-org/sbom-repo.git"
-  secretName: git-sync-credentials
-```
-
-> **⚠️  Limitation:** git-sync runs as a sidecar and struggles with very large repos (multi-GB). For repos like `cncf/sbom` (~14 GB), the sidecar times out or OOM-kills. Use the **seed job** (Option A) instead.
-
-### Option C: Pre-populated PVC (manual / CI pipeline)
-
-If your SBOMs are not in a Git repo, or come from a CI pipeline, S3, or an artifact registry:
-
-```yaml
+s3:
+  buckets: ""
 gitSync:
   enabled: false
-# No seedJob — you manage the PVC content yourself.
 
 sbomSource:
   pvcName: my-preloaded-sbom-pvc
 ```
 
-Populate the PVC however you prefer (kubectl cp, CI job, initContainer, etc.), then trigger the Ingestion Watcher:
+Populate the PVC however you prefer, then trigger the Ingestion Watcher:
 ```bash
 kubectl create job --from=cronjob/seebom-ingestion-watcher manual-ingest -n seebom
 ```
 
 ### Supported File Types
 
-The Ingestion Watcher scans the SBOM directory **recursively** for:
-
 | Pattern | Type |
 |---------|------|
-| `*.spdx.json` | SPDX SBOM |
+| `*.spdx.json` / `*_spdx.json` | SPDX SBOM |
 | `*.openvex.json` | OpenVEX statement |
 | `*.vex.json` | OpenVEX statement |
 
 Files are **deduplicated by SHA256 hash** — uploading the same file twice will not create duplicates.
 
-> **Note:** VEX files should be placed alongside SBOM files in the same directory. They are never truncated by `SBOM_LIMIT`.
-
-### Volume Scheduling (multi-node clusters)
-
-When using a PVC (`gitSync.enabled: false`), the SBOM volume is `ReadWriteOnce` (RWO) — it can only be mounted on a single node. The Helm chart automatically adds **pod affinity** (`seebom.io/sbom-volume` label) to all workloads that mount this PVC (Parsing Workers, API Gateway, Ingestion Watcher, Seed Job), ensuring they are scheduled on the same node.
-
-This is transparent and requires no manual configuration. If you need to spread pods across nodes, switch to `ReadWriteMany` (RWX) storage and remove the affinity by setting `gitSync.enabled: true` with an `emptyDir` approach.
-
-> **Note:** The directory scanner automatically skips `lost+found` (common on ext4-formatted block volumes), `.git`, and other hidden directories. No manual cleanup of the PVC is needed.
+> **Note:** VEX files are never truncated by `SBOM_LIMIT`.
 
 ---
 
@@ -245,18 +297,87 @@ See `ui/src/assets/custom-theme.example.css` for all available variables.
 
 ---
 
-## 5. Full Deployment Example
+## 5. Site Configuration – Customising UI Texts
+
+All UI text content — brand name, page title, dashboard title/subtitle, description banner, and disclaimer — can be overridden **without rebuilding Angular** via a JSON config file (`ui-config.json`).
+
+The Angular app loads `/ui-config.json` at startup. Missing keys gracefully fall back to the built-in SeeBOM defaults.
+
+### Enable the site config ConfigMap
+
+```yaml
+# values-production.yaml
+ui:
+  siteConfig:
+    enabled: true
+    content:
+      brandName: "My Platform"
+      pageTitle: "My Platform"
+      dashboard:
+        title: "Overview"
+        subtitle: "Software Supply Chain Governance"
+        description: "<strong>Welcome</strong> to our internal SBOM governance dashboard."
+        disclaimer: "Internal use only. Data is provided as-is."
+      footer:
+        enabled: true
+        text: "© 2026 My Company"
+```
+
+### Configurable fields
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `brandName` | string | `SeeBOM` | Navbar brand text (top left) |
+| `pageTitle` | string | `SeeBOM` | Browser tab title (`<title>`) |
+| `dashboard.title` | string | `Dashboard` | Dashboard page heading |
+| `dashboard.subtitle` | string | `Software Bill of Materials — Governance Overview` | Dashboard subheading |
+| `dashboard.description` | HTML string | *(SeeBOM description)* | Description banner on dashboard. Supports HTML (links, bold, etc.) |
+| `dashboard.disclaimer` | HTML string | *(default disclaimer)* | Disclaimer text at bottom of dashboard. Supports HTML. |
+| `footer.enabled` | boolean | `false` | Show a footer bar below the main content |
+| `footer.text` | string | `""` | Footer text content |
+
+All fields are **optional**. Omitted keys use the built-in defaults.
+
+### Apply changes
+
+After editing the ConfigMap, restart the UI deployment:
 
 ```bash
-# 1. Install the Helm chart
+kubectl rollout restart deployment seebom-ui
+```
+
+### Local development (Docker Compose)
+
+Edit the default config file directly:
+
+```bash
+vim ui/public/ui-config.json
+docker compose up -d --force-recreate ui
+```
+
+Or point to a custom file via the `UI_CONFIG` environment variable:
+
+```bash
+UI_CONFIG=./my-ui-config.json docker compose up -d --force-recreate ui
+```
+
+> **Note:** The config file is served with `Cache-Control: no-cache` by nginx, so changes take effect on the next browser reload without clearing caches.
+
+---
+
+## 6. Full Deployment Example
+
+### S3-based (recommended)
+
+```bash
+# 1. Install with S3 ingestion
 helm install seebom ./deploy/helm/seebom \
   -f values-production.yaml \
-  --set image.registry=ghcr.io \
-  --set image.repository=your-org/seebom \
-  --set image.tag=0.1.0 \
-  --set gitSync.repo=https://github.com/your-org/sbom-repo.git \
+  --set image.tag=0.1.3 \
+  --set 's3.buckets=[{"name":"cncf-subproject-sboms","region":"us-east-1"},{"name":"cncf-project-sboms","region":"us-east-1"}]' \
+  --set s3.accessKey="AKIA..." \
+  --set s3.secretKey="..." \
   --set parsingWorker.replicas=10 \
-  --set parsingWorker.skipOSV=false \
   --set ui.customTheme.enabled=true
 
 # 2. Override license exceptions from a local file
@@ -281,9 +402,19 @@ kubectl rollout restart deployment seebom-api-gateway seebom-parsing-worker seeb
 kubectl create job --from=cronjob/seebom-ingestion-watcher seebom-initial-ingest
 ```
 
+### Volume-based (alternative)
+
+```bash
+helm install seebom ./deploy/helm/seebom \
+  -f values-production.yaml \
+  --set image.tag=0.1.3 \
+  --set gitSync.repo=https://github.com/your-org/sbom-repo.git \
+  --set parsingWorker.replicas=10
+```
+
 ---
 
-## 6. Verifying the Deployment
+## 7. Verifying the Deployment
 
 ```bash
 # Check all pods are running
@@ -304,7 +435,7 @@ kubectl exec -it $(kubectl get pod -l app.kubernetes.io/component=api-gateway -o
 
 ---
 
-## 7. Local Development
+## 8. Local Development
 
 Copy `.env.example` to `.env` and adjust:
 
@@ -314,12 +445,19 @@ cp .env.example .env
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SBOM_SOURCE_DIR` | `./sboms` | Path to your SBOM files (can point to an external repo checkout) |
+| `S3_BUCKETS` | *(empty)* | JSON array of S3 bucket configs (recommended). See `.env.example` for format. |
+| `S3_BUCKET` | *(empty)* | Single S3 bucket name (simpler alternative to `S3_BUCKETS`). |
+| `S3_ENDPOINT` | `s3.amazonaws.com` | S3 endpoint URL. |
+| `S3_REGION` | `us-east-1` | AWS region. |
+| `S3_ACCESS_KEY` | *(empty)* | Shared S3 access key. Leave empty for public buckets. |
+| `S3_SECRET_KEY` | *(empty)* | Shared S3 secret key. |
+| `SBOM_SOURCE_DIR` | `./sboms` | Path to local SBOM files (used alongside or instead of S3). |
 | `SBOM_LIMIT` | `0` | Max SBOMs to enqueue per watcher run. `0` = unlimited. VEX files are never limited. |
 | `WORKER_REPLICAS` | `1` | Number of parallel parsing worker containers |
 | `WORKER_BATCH_SIZE` | `50` | Jobs claimed per polling cycle per worker |
 | `SKIP_OSV` | `false` | Skip OSV vulnerability API calls. Set `true` for fast initial bulk load. |
 | `CUSTOM_THEME` | (example file) | Path to a custom CSS theme file for the UI |
+| `UI_CONFIG` | `./ui/public/ui-config.json` | Path to a JSON file with UI text overrides (brand, titles, disclaimer) |
 
 ### Useful Make targets
 
@@ -340,11 +478,13 @@ cp .env.example .env
 
 | What | Where | How to Change |
 |---|---|---|
-| **SBOMs** | Git repo → git-sync → emptyDir volume | Push to Git, CronJob re-syncs every 6h |
-| **VEX files** | Same directory as SBOMs | Place `*.openvex.json` or `*.vex.json` alongside SBOMs |
+| **SBOMs (S3)** | S3-compatible buckets | Configure `s3.buckets` in Helm values, CronJob streams objects |
+| **SBOMs (volume)** | PVC via seed job or git-sync | Push to Git, seed job clones or git-sync re-syncs |
+| **VEX files** | Same S3 bucket or directory as SBOMs | Place `*.openvex.json` or `*.vex.json` alongside SBOMs |
 | **License Exceptions** | `seebom-license-exceptions` ConfigMap | `kubectl edit configmap` → restart API |
 | **License Policy** | `seebom-license-policy` ConfigMap | `kubectl edit configmap` → restart API + Workers |
 | **Custom Theme** | `seebom-custom-theme` ConfigMap | `kubectl create configmap` → restart UI |
+| **Site Config** | `seebom-ui-config` ConfigMap | Helm values `ui.siteConfig.content.*` → restart UI |
 | **Dark Mode** | Built-in toggle (navbar) | User preference, stored in browser localStorage |
 | **ClickHouse password** | `seebom-secret` Secret | `kubectl edit secret` |
-
+| **S3 credentials** | `seebom-secret` Secret | `--set s3.accessKey=...` or `kubectl edit secret` |

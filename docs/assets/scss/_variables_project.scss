@@ -1,0 +1,30 @@
+/*
+ * SeeBOM Docs – Docsy SCSS variable overrides
+ * Colors matched to seebom-website/static/css/main.css
+ */
+
+// Brand colors – exact match from seebom-website
+$primary:   #1A8A8A;  // --accent
+$secondary: #E8871E;  // --accent-orange
+$info:      #147272;  // --accent-hover
+$success:   #0D6B5E;  // --status-success-bg origin
+$warning:   #D07518;  // --accent-orange-hover
+$danger:    #C43030;  // --severity-critical
+
+// Dark body tones from seebom-website
+$body-bg:           #121218;  // --bg
+$body-color:        #e0e0e6;  // --text
+
+// Typography – same stack as seebom-website
+$font-family-sans-serif: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+$font-size-base: 0.95rem;
+$line-height-base: 1.6;
+
+// Links
+$link-color:       #1A8A8A;
+$link-hover-color: #147272;
+
+// Navbar
+$navbar-dark-color:        #8b8b9a;  // --nav-link
+$navbar-dark-hover-color:  #f0f0f0;  // --nav-link-hover
+$navbar-dark-active-color: #f0f0f0;

@@ -14,18 +14,29 @@ data:
         root /usr/share/nginx/html;
         index index.html;
 
+        # Use kube-dns for runtime DNS resolution (prevents crash if upstream isn't ready yet).
+        resolver kube-dns.kube-system.svc.cluster.local valid=10s;
+
         # Angular routing: serve index.html for all non-file routes.
         location / {
             try_files $uri $uri/ /index.html;
         }
 
         # Proxy API requests to the API Gateway Kubernetes service.
+        # Using a variable forces nginx to re-resolve DNS at runtime instead of only at startup.
         location /api/ {
-            proxy_pass http://{{ .Release.Name }}-api-gateway:{{ .Values.apiGateway.service.port }};
+            set $backend "http://{{ .Release.Name }}-api-gateway.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.apiGateway.service.port }}";
+            proxy_pass $backend;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Runtime config files: no cache so edits take effect on reload.
+        location ~* ^/(ui-config\.json|custom-theme\.css)$ {
+            add_header Cache-Control "no-cache, no-store, must-revalidate";
+            expires 0;
         }
 
         # Cache static assets aggressively.

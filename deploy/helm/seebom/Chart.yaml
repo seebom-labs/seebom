@@ -1,6 +1,6 @@
 apiVersion: v2
 name: seebom
-description: SeeBOM Labs - Kubernetes-native SBOM visualization and governance platform
+description: SeeBOM - Kubernetes-native SBOM visualization and governance platform
 type: application
 version: 0.1.3
 appVersion: "0.1.3"

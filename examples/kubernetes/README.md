@@ -8,7 +8,6 @@ Example Helm values for deploying SeeBOM to a real Kubernetes cluster
 - Kubernetes ≥ 1.27
 - Helm ≥ 3.12
 - [Altinity ClickHouse Operator](https://github.com/Altinity/clickhouse-operator) installed
-- A StorageClass that supports `ReadWriteOnce` PVCs
 
 ## Quick Start
 
@@ -26,9 +25,10 @@ kubectl create secret generic seebom-secret -n seebom \
 cp examples/kubernetes/values-production.yaml my-values.yaml
 vi my-values.yaml
 
-# 4. Install
+# 4. Install (with S3 ingestion)
 helm install seebom deploy/helm/seebom/ \
-  -n seebom -f my-values.yaml
+  -n seebom -f my-values.yaml \
+  --set 's3.buckets=[{"name":"cncf-subproject-sboms","region":"us-east-1"}]'
 
 # Or from the OCI registry:
 helm install seebom oci://ghcr.io/seebom-labs/seebom/charts/seebom \
@@ -39,18 +39,35 @@ helm install seebom oci://ghcr.io/seebom-labs/seebom/charts/seebom \
 
 | File | SBOM Source | Best For |
 |------|-------------|----------|
-| `values-production.yaml` | **Seed job** (shallow clone into PVC) | Large repos (e.g. cncf/sbom ~14 GB), HA replicas |
-| `values-minimal.yaml` | **git-sync** (sidecar, continuous pull) | Small repos (< 1 GB), CI/staging |
+| `values-production.yaml` | **S3 buckets** (default) or seed job (PVC fallback) | Production, large-scale ingestion |
+| `values-minimal.yaml` | **S3 buckets** (default) or git-sync (PVC fallback) | Small repos (< 1 GB), CI/staging |
 
 ---
 
 ## How SBOMs Are Loaded
 
-SeeBOM reads `.spdx.json` files from a PVC mounted at `/data/sboms`. There are three ways to populate this PVC:
+SeeBOM supports multiple ingestion methods. **S3 is the default and recommended approach** — no PVCs, no volume scheduling, scales to any repo size. Volume-based methods are available as alternatives.
 
-### Method 1: Seed Job (recommended for large repos)
+### Method 1: S3 Buckets (default, recommended)
 
-Used by `values-production.yaml` and `values-kind.yaml`.
+The Ingestion Watcher streams `ListObjects` from each configured S3 bucket (paginated, memory-efficient). The Parsing Workers fetch objects on-demand via `s3://bucket/key` URIs. No PVC required.
+
+```yaml
+s3:
+  buckets: '[{"name":"cncf-subproject-sboms","region":"us-east-1"},{"name":"cncf-project-sboms","region":"us-east-1"}]'
+  accessKey: ""   # pass via --set for private buckets
+  secretKey: ""
+```
+
+Supports any S3-compatible storage: AWS S3, MinIO, GCS, Ceph, DigitalOcean Spaces.
+
+Supported file patterns: `*.spdx.json`, `*_spdx.json`, `*.openvex.json`, `*.vex.json`.
+
+Nested keys like `k3s-io/helm-controller/0.16.14/k3s-io_helm-controller_0_16_14_spdx.json` are fully supported.
+
+### Method 2: Seed Job (alternative, for environments without S3)
+
+Used by `values-production.yaml` when `s3.buckets` is empty.
 
 A Kubernetes Job runs once at install time and:
 1. Does a **shallow `git clone`** of your SBOM repo into a temp directory
@@ -58,6 +75,9 @@ A Kubernetes Job runs once at install time and:
 3. Optionally downloads the [CNCF license exceptions](https://github.com/cncf/foundation/blob/main/license-exceptions/exceptions.json) into the PVC
 
 ```yaml
+s3:
+  buckets: ""              # disable S3
+
 gitSync:
   enabled: false           # disable git-sync
 
@@ -70,21 +90,24 @@ sbomSource:
   storageSize: 20Gi        # must be large enough for the full repo
 ```
 
-**Advantages:** Works with any repo size. Single clone, no sidecar overhead. All pods are automatically co-scheduled on the same node via pod affinity (required for RWO volumes on multi-node clusters).
-
 **Refreshing:** Delete the seed job and re-run Helm upgrade:
 ```bash
 kubectl delete job -n seebom -l app.kubernetes.io/component=seed-sboms
 helm upgrade seebom deploy/helm/seebom/ -n seebom -f my-values.yaml
 ```
 
-### Method 2: git-sync (recommended for small repos)
+> **Note:** Requires a `ReadWriteOnce` PVC. All pods are automatically co-scheduled on the same node via pod affinity.
 
-Used by `values-minimal.yaml`.
+### Method 3: git-sync (alternative, for small repos)
+
+Used by `values-minimal.yaml` when `s3.buckets` is empty.
 
 A [git-sync](https://github.com/kubernetes/git-sync) sidecar runs alongside the Ingestion Watcher and continuously pulls from your Git repo.
 
 ```yaml
+s3:
+  buckets: ""              # disable S3
+
 gitSync:
   enabled: true
   repo: "https://github.com/your-org/sbom-repo.git"
@@ -92,46 +115,24 @@ gitSync:
   depth: 1
   period: "6h"             # re-sync every 6 hours
   timeout: 120             # seconds for git operations
-  # For private repos:
-  # secretName: git-sync-ssh-key
-
-sbomSource:
-  storageSize: 5Gi
 ```
 
-**Advantages:** Automatic updates, no manual refresh needed.
+**⚠️  Limitation:** git-sync struggles with very large repos (multi-GB). Use S3 or the seed job for repos like `cncf/sbom` (~14 GB).
 
-**⚠️  Limitation:** git-sync struggles with very large repos (multi-GB). For repos like `cncf/sbom` (~14 GB, 6500+ files), the sidecar times out or OOM-kills. Use the seed job method instead.
+### Method 4: Pre-populated PVC (manual / CI pipeline)
 
-### Method 3: Pre-populated PVC (manual / CI pipeline)
-
-If your SBOMs are not in a Git repo, or you have a custom CI pipeline, you can populate the PVC yourself:
+If your SBOMs are not in S3 or a Git repo, you can populate the PVC yourself:
 
 ```yaml
+s3:
+  buckets: ""
 gitSync:
   enabled: false
-
-# No seedJob configured — you manage the PVC content yourself.
 
 sbomSource:
   pvcName: seebom-sbom-data
   mountPath: /data/sboms
   storageSize: 10Gi
-```
-
-Then copy files into the PVC:
-
-```bash
-# Option A: kubectl cp from a running pod
-kubectl cp ./my-sboms/ seebom/<any-running-pod>:/data/sboms/ -c <container>
-
-# Option B: Use a one-shot Job
-kubectl create job copy-sboms --image=busybox -- \
-  sh -c "cp /source/*.spdx.json /data/sboms/"
-# (mount both source and target PVCs)
-
-# Option C: Use an initContainer in your CI pipeline
-# that pulls SBOMs from S3, GCS, or an artifact registry
 ```
 
 After populating the PVC, trigger the Ingestion Watcher:
@@ -207,4 +208,3 @@ spec:
 kubectl port-forward -n seebom svc/seebom-ui 8090:80 &
 kubectl port-forward -n seebom svc/seebom-api-gateway 8080:80 &
 ```
-

@@ -1,10 +1,24 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
+
+// S3BucketConfig holds the configuration for a single S3 bucket source.
+type S3BucketConfig struct {
+	Name         string `json:"name"`
+	Endpoint     string `json:"endpoint"`
+	Region       string `json:"region"`
+	AccessKey    string `json:"accessKey"`
+	SecretKey    string `json:"secretKey"`
+	Prefix       string `json:"prefix"`
+	UsePathStyle bool   `json:"usePathStyle"`
+	UseSSL       bool   `json:"useSSL"`
+}
 
 // Config holds all configuration values, read from environment variables.
 type Config struct {
@@ -15,11 +29,15 @@ type Config struct {
 	ClickHouseUser     string
 	ClickHousePassword string
 
-	// SBOM source directory
+	// SBOM source directory (local filesystem)
 	SBOMDir string
 
+	// S3 bucket sources (multiple buckets supported)
+	S3Buckets []S3BucketConfig
+
 	// API Gateway
-	APIPort int
+	APIPort            int
+	CORSAllowedOrigins string // Comma-separated allowed origins (default "*" for dev)
 
 	// Worker
 	WorkerID        string
@@ -44,6 +62,7 @@ func Load() (*Config, error) {
 		ClickHousePassword: getEnv("CLICKHOUSE_PASSWORD", ""),
 		SBOMDir:            getEnv("SBOM_DIR", "./sboms"),
 		APIPort:            getEnvInt("API_PORT", 8080),
+		CORSAllowedOrigins: getEnv("CORS_ALLOWED_ORIGINS", "*"),
 		WorkerID:           getEnv("WORKER_ID", ""),
 		WorkerBatchSize:    getEnvInt("WORKER_BATCH_SIZE", 10),
 		SkipOSV:            getEnvBool("SKIP_OSV", false),
@@ -62,7 +81,57 @@ func Load() (*Config, error) {
 		cfg.WorkerID = hostname
 	}
 
+	// Parse S3 bucket configurations.
+	// Option 1: JSON array in S3_BUCKETS env var.
+	if bucketsJSON := getEnv("S3_BUCKETS", ""); bucketsJSON != "" {
+		var buckets []S3BucketConfig
+		if err := json.Unmarshal([]byte(bucketsJSON), &buckets); err != nil {
+			return nil, fmt.Errorf("failed to parse S3_BUCKETS JSON: %w", err)
+		}
+		cfg.S3Buckets = buckets
+	}
+
+	// Option 2: Simple single-bucket env vars (merged with JSON buckets).
+	if name := getEnv("S3_BUCKET", ""); name != "" {
+		cfg.S3Buckets = append(cfg.S3Buckets, S3BucketConfig{
+			Name:         name,
+			Endpoint:     getEnv("S3_ENDPOINT", ""), // empty = auto-resolve from region
+			Region:       getEnv("S3_REGION", "us-east-1"),
+			AccessKey:    getEnv("S3_ACCESS_KEY", ""),
+			SecretKey:    getEnv("S3_SECRET_KEY", ""),
+			Prefix:       getEnv("S3_PREFIX", ""),
+			UsePathStyle: getEnvBool("S3_USE_PATH_STYLE", false),
+			UseSSL:       getEnvBool("S3_USE_SSL", true),
+		})
+	}
+
+	// Apply shared credentials to buckets that don't have their own.
+	sharedAccessKey := getEnv("S3_ACCESS_KEY", "")
+	sharedSecretKey := getEnv("S3_SECRET_KEY", "")
+	for i := range cfg.S3Buckets {
+		if cfg.S3Buckets[i].AccessKey == "" && sharedAccessKey != "" {
+			cfg.S3Buckets[i].AccessKey = sharedAccessKey
+		}
+		if cfg.S3Buckets[i].SecretKey == "" && sharedSecretKey != "" {
+			cfg.S3Buckets[i].SecretKey = sharedSecretKey
+		}
+		// Default region.
+		if cfg.S3Buckets[i].Region == "" {
+			cfg.S3Buckets[i].Region = "us-east-1"
+		}
+		// Endpoint is resolved at client creation time from region (not here),
+		// so we leave it empty to signal "use regional default".
+	}
+
+	// Deduplicate bucket names.
+	cfg.S3Buckets = deduplicateBuckets(cfg.S3Buckets)
+
 	return cfg, nil
+}
+
+// HasS3Sources returns true if any S3 buckets are configured.
+func (c *Config) HasS3Sources() bool {
+	return len(c.S3Buckets) > 0
 }
 
 // ClickHouseDSN returns the ClickHouse connection string.
@@ -72,8 +141,25 @@ func (c *Config) ClickHouseDSN() string {
 		c.ClickHouseHost, c.ClickHousePort, c.ClickHouseDatabase)
 }
 
+// deduplicateBuckets removes duplicate bucket entries by name.
+// Later entries override earlier ones.
+func deduplicateBuckets(buckets []S3BucketConfig) []S3BucketConfig {
+	seen := make(map[string]int, len(buckets))
+	var result []S3BucketConfig
+	for _, b := range buckets {
+		key := b.Name + "|" + b.Prefix
+		if idx, ok := seen[key]; ok {
+			result[idx] = b // override
+		} else {
+			seen[key] = len(result)
+			result = append(result, b)
+		}
+	}
+	return result
+}
+
 func getEnv(key, fallback string) string {
-	if val, ok := os.LookupEnv(key); ok {
+	if val, ok := os.LookupEnv(key); ok && val != "" {
 		return val
 	}
 	return fallback
@@ -93,8 +179,21 @@ func getEnvInt(key string, fallback int) int {
 
 func getEnvBool(key string, fallback bool) bool {
 	val, ok := os.LookupEnv(key)
-	if !ok {
+	if !ok || val == "" {
 		return fallback
 	}
 	return val == "1" || val == "true" || val == "yes"
+}
+
+// S3BucketNames returns a comma-separated list of configured bucket names (for logging).
+func (c *Config) S3BucketNames() string {
+	names := make([]string, len(c.S3Buckets))
+	for i, b := range c.S3Buckets {
+		if b.Prefix != "" {
+			names[i] = b.Name + "/" + b.Prefix
+		} else {
+			names[i] = b.Name
+		}
+	}
+	return strings.Join(names, ", ")
 }

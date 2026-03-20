@@ -1,0 +1,110 @@
+baseURL = "https://docs.seebom.dev/"
+title = "SeeBOM"
+languageCode = "en-us"
+defaultContentLanguage = "en"
+defaultContentLanguageInSubdir = false
+
+# Hugo modules – Docsy theme
+[module]
+  proxy = "direct"
+  [module.hugoVersion]
+    extended = true
+    min = "0.140.0"
+  [[module.imports]]
+    path = "github.com/google/docsy"
+    disable = false
+  [[module.imports]]
+    path = "github.com/google/docsy/dependencies"
+    disable = false
+
+# Ignore the original markdown files in docs/ root (they are preserved as-is)
+ignoreFiles = ["^[A-Z_]+\\.md$"]
+
+enableRobotsTXT = true
+enableGitInfo = false
+
+# Taxonomy
+[taxonomies]
+  tag = "tags"
+  category = "categories"
+
+# Highlighting
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.parser.attribute]
+      block = true
+    [markup.goldmark.renderer]
+      unsafe = true
+  [markup.highlight]
+    style = "monokai"
+
+# Top navbar
+[menu]
+  [[menu.main]]
+    name = "Docs"
+    weight = 10
+    url = "/docs/"
+    identifier = "docs"
+  [[menu.main]]
+    name = "Getting Started"
+    weight = 20
+    url = "/docs/getting-started/"
+    identifier = "getting-started"
+  [[menu.main]]
+    name = "Architecture"
+    weight = 30
+    url = "/docs/architecture/"
+    identifier = "architecture"
+  [[menu.main]]
+    name = "Deployment"
+    weight = 40
+    url = "/docs/deployment/"
+    identifier = "deployment"
+  [[menu.main]]
+    name = "Development"
+    weight = 50
+    url = "/docs/development/"
+    identifier = "development"
+  [[menu.main]]
+    name = "Release"
+    weight = 60
+    url = "/docs/release/"
+    identifier = "release"
+  [[menu.main]]
+    name = "GitHub"
+    weight = 90
+    url = "https://github.com/seebom-labs/seebom"
+    pre = "<i class='fab fa-github'></i>"
+    identifier = "github"
+
+# Docsy parameters
+[params]
+  description = "Kubernetes-native SBOM Visualization & Governance Platform"
+  github_repo = "https://github.com/seebom-labs/seebom"
+  github_project_repo = "https://github.com/seebom-labs/seebom"
+  github_branch = "main"
+
+  [params.ui]
+    sidebar_menu_compact = true
+    sidebar_menu_foldable = true
+    sidebar_search_disable = false
+    navbar_logo = true
+    navbar_translucent_over_cover_disable = true
+    # NO theme toggle
+    showLightDarkModeMenu = false
+    # Show 3 levels in sidebar
+    ul_show = 3
+    [params.ui.readingtime]
+      enable = false
+
+  [params.links]
+    [[params.links.developer]]
+      name = "GitHub"
+      url = "https://github.com/seebom-labs/seebom"
+      icon = "fab fa-github"
+      desc = "Source code and issue tracker"
+
+[outputs]
+  home = ["HTML"]
+  section = ["HTML"]
+

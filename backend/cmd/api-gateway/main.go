@@ -4,12 +4,22 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"regexp"
 	"strconv"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/seebom-labs/seebom/backend/internal/clickhouse"
 	"github.com/seebom-labs/seebom/backend/internal/config"
 	"github.com/seebom-labs/seebom/backend/internal/license"
 )
+
+// uuidPattern validates UUID path parameters to prevent injection.
+var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+// vulnIDPattern validates vulnerability IDs (e.g., CVE-2024-12345, GHSA-xxxx-xxxx-xxxx).
+var vulnIDPattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,100}$`)
 
 func main() {
 	log.Println("SeeBOM API Gateway starting...")
@@ -57,7 +67,7 @@ func main() {
 	// List SBOMs with pagination.
 	mux.HandleFunc("GET /api/v1/sboms", func(w http.ResponseWriter, r *http.Request) {
 		page := parseUint64(r.URL.Query().Get("page"), 1)
-		pageSize := parseUint64(r.URL.Query().Get("page_size"), 50)
+		pageSize := clampPageSize(parseUint64(r.URL.Query().Get("page_size"), 50))
 
 		resp, err := chClient.QuerySBOMs(r.Context(), page, pageSize)
 		if err != nil {
@@ -71,8 +81,12 @@ func main() {
 	// List vulnerabilities with pagination and optional VEX filtering.
 	mux.HandleFunc("GET /api/v1/vulnerabilities", func(w http.ResponseWriter, r *http.Request) {
 		page := parseUint64(r.URL.Query().Get("page"), 1)
-		pageSize := parseUint64(r.URL.Query().Get("page_size"), 50)
-		vexFilter := r.URL.Query().Get("vex_filter") // "effective" to exclude not_affected
+		pageSize := clampPageSize(parseUint64(r.URL.Query().Get("page_size"), 50))
+		vexFilter := r.URL.Query().Get("vex_filter")
+		// Only allow known filter values to prevent unexpected query modification.
+		if vexFilter != "" && vexFilter != "effective" {
+			vexFilter = ""
+		}
 
 		resp, err := chClient.QueryVulnerabilities(r.Context(), page, pageSize, vexFilter)
 		if err != nil {
@@ -97,14 +111,14 @@ func main() {
 	// SBOM dependency tree.
 	mux.HandleFunc("GET /api/v1/sboms/{id}/dependencies", func(w http.ResponseWriter, r *http.Request) {
 		sbomID := r.PathValue("id")
-		if sbomID == "" {
-			writeError(w, http.StatusBadRequest, "Missing SBOM ID")
+		if !isValidUUID(sbomID) {
+			writeError(w, http.StatusBadRequest, "Invalid SBOM ID")
 			return
 		}
 
 		nodes, err := chClient.QuerySBOMDependencies(r.Context(), sbomID)
 		if err != nil {
-			log.Printf("ERROR: sbom dependencies for %s: %v", sbomID, err)
+			log.Printf("ERROR: sbom dependencies for %s: %v", sanitizeLogParam(sbomID), err)
 			writeError(w, http.StatusInternalServerError, "Failed to fetch dependencies")
 			return
 		}
@@ -114,13 +128,13 @@ func main() {
 	// SBOM detail with severity breakdown.
 	mux.HandleFunc("GET /api/v1/sboms/{id}/detail", func(w http.ResponseWriter, r *http.Request) {
 		sbomID := r.PathValue("id")
-		if sbomID == "" {
-			writeError(w, http.StatusBadRequest, "Missing SBOM ID")
+		if !isValidUUID(sbomID) {
+			writeError(w, http.StatusBadRequest, "Invalid SBOM ID")
 			return
 		}
 		detail, err := chClient.QuerySBOMDetail(r.Context(), sbomID)
 		if err != nil {
-			log.Printf("ERROR: sbom detail for %s: %v", sbomID, err)
+			log.Printf("ERROR: sbom detail for %s: %v", sanitizeLogParam(sbomID), err)
 			writeError(w, http.StatusInternalServerError, "Failed to fetch SBOM detail")
 			return
 		}
@@ -130,13 +144,13 @@ func main() {
 	// Vulnerabilities for a specific SBOM.
 	mux.HandleFunc("GET /api/v1/sboms/{id}/vulnerabilities", func(w http.ResponseWriter, r *http.Request) {
 		sbomID := r.PathValue("id")
-		if sbomID == "" {
-			writeError(w, http.StatusBadRequest, "Missing SBOM ID")
+		if !isValidUUID(sbomID) {
+			writeError(w, http.StatusBadRequest, "Invalid SBOM ID")
 			return
 		}
 		vulns, err := chClient.QuerySBOMVulnerabilities(r.Context(), sbomID)
 		if err != nil {
-			log.Printf("ERROR: sbom vulns for %s: %v", sbomID, err)
+			log.Printf("ERROR: sbom vulns for %s: %v", sanitizeLogParam(sbomID), err)
 			writeError(w, http.StatusInternalServerError, "Failed to fetch SBOM vulnerabilities")
 			return
 		}
@@ -146,13 +160,13 @@ func main() {
 	// Licenses for a specific SBOM.
 	mux.HandleFunc("GET /api/v1/sboms/{id}/licenses", func(w http.ResponseWriter, r *http.Request) {
 		sbomID := r.PathValue("id")
-		if sbomID == "" {
-			writeError(w, http.StatusBadRequest, "Missing SBOM ID")
+		if !isValidUUID(sbomID) {
+			writeError(w, http.StatusBadRequest, "Invalid SBOM ID")
 			return
 		}
 		licenses, err := chClient.QuerySBOMLicenses(r.Context(), sbomID)
 		if err != nil {
-			log.Printf("ERROR: sbom licenses for %s: %v", sbomID, err)
+			log.Printf("ERROR: sbom licenses for %s: %v", sanitizeLogParam(sbomID), err)
 			writeError(w, http.StatusInternalServerError, "Failed to fetch SBOM licenses")
 			return
 		}
@@ -175,13 +189,13 @@ func main() {
 	// Projects affected by a specific CVE (including transitive dependencies).
 	mux.HandleFunc("GET /api/v1/vulnerabilities/{id}/affected-projects", func(w http.ResponseWriter, r *http.Request) {
 		vulnID := r.PathValue("id")
-		if vulnID == "" {
-			writeError(w, http.StatusBadRequest, "Missing vulnerability ID")
+		if !isValidVulnID(vulnID) {
+			writeError(w, http.StatusBadRequest, "Invalid vulnerability ID")
 			return
 		}
 		projects, err := chClient.QueryAffectedProjectsByCVE(r.Context(), vulnID)
 		if err != nil {
-			log.Printf("ERROR: affected projects for %s: %v", vulnID, err)
+			log.Printf("ERROR: affected projects for %s: %v", sanitizeLogParam(vulnID), err)
 			writeError(w, http.StatusInternalServerError, "Failed to fetch affected projects")
 			return
 		}
@@ -190,7 +204,7 @@ func main() {
 
 	// Dependency usage statistics across all projects.
 	mux.HandleFunc("GET /api/v1/stats/dependencies", func(w http.ResponseWriter, r *http.Request) {
-		limit := parseUint64(r.URL.Query().Get("limit"), 50)
+		limit := clampPageSize(parseUint64(r.URL.Query().Get("limit"), 50))
 		stats, err := chClient.QueryDependencyStats(r.Context(), limit)
 		if err != nil {
 			log.Printf("ERROR: dependency stats: %v", err)
@@ -203,7 +217,7 @@ func main() {
 	// VEX statements list with pagination.
 	mux.HandleFunc("GET /api/v1/vex/statements", func(w http.ResponseWriter, r *http.Request) {
 		page := parseUint64(r.URL.Query().Get("page"), 1)
-		pageSize := parseUint64(r.URL.Query().Get("page_size"), 50)
+		pageSize := clampPageSize(parseUint64(r.URL.Query().Get("page_size"), 50))
 
 		resp, err := chClient.QueryVEXStatements(r.Context(), page, pageSize)
 		if err != nil {
@@ -244,8 +258,12 @@ func main() {
 		writeJSON(w, http.StatusOK, packages)
 	})
 
-	// CORS middleware for Angular dev server.
-	handler := corsMiddleware(mux)
+	// CORS + security middleware for Angular dev server.
+	handler := securityHeadersMiddleware(
+		rateLimitMiddleware(
+			corsMiddleware(cfg.CORSAllowedOrigins, mux),
+		),
+	)
 
 	addr := ":" + strconv.Itoa(cfg.APIPort)
 	log.Printf("API Gateway listening on %s", addr)
@@ -279,15 +297,139 @@ func parseUint64(s string, fallback uint64) uint64 {
 	return v
 }
 
-func corsMiddleware(next http.Handler) http.Handler {
+// clampPageSize enforces a maximum page size to prevent abusive queries.
+func clampPageSize(v uint64) uint64 {
+	const maxPageSize = 500
+	if v == 0 {
+		return 50
+	}
+	if v > maxPageSize {
+		return maxPageSize
+	}
+	return v
+}
+
+// isValidUUID checks whether the given string matches UUID format.
+func isValidUUID(s string) bool {
+	return s != "" && uuidPattern.MatchString(s)
+}
+
+// isValidVulnID checks whether the string is a valid vulnerability identifier
+// (CVE-xxxx-xxxx, GHSA-xxxx, OSV-xxxx, etc.).
+func isValidVulnID(s string) bool {
+	return s != "" && vulnIDPattern.MatchString(s)
+}
+
+// sanitizeLogParam strips newlines and control characters to prevent log injection.
+func sanitizeLogParam(s string) string {
+	s = strings.ReplaceAll(s, "\n", "")
+	s = strings.ReplaceAll(s, "\r", "")
+	if len(s) > 200 {
+		s = s[:200] + "..."
+	}
+	return s
+}
+
+// securityHeadersMiddleware adds standard security headers to every response.
+func securityHeadersMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-XSS-Protection", "0") // Modern browsers: CSP replaces this
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+		next.ServeHTTP(w, r)
+	})
+}
+
+// corsMiddleware handles CORS with configurable allowed origins.
+func corsMiddleware(allowedOrigins string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+
+		if allowedOrigins == "*" {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+		} else if origin != "" {
+			for _, allowed := range strings.Split(allowedOrigins, ",") {
+				if strings.TrimSpace(allowed) == origin {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+					w.Header().Set("Vary", "Origin")
+					break
+				}
+			}
+		}
+
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Max-Age", "86400")
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// rateLimitMiddleware implements a simple per-IP sliding-window rate limiter.
+// Allows 100 requests per 10 seconds per IP.
+func rateLimitMiddleware(next http.Handler) http.Handler {
+	type visitor struct {
+		count    int
+		windowAt time.Time
+	}
+	var (
+		mu       sync.Mutex
+		visitors = make(map[string]*visitor)
+	)
+
+	const (
+		maxRequests = 100
+		window      = 10 * time.Second
+	)
+
+	// Background cleanup every 60 seconds to prevent memory leak.
+	go func() {
+		for {
+			time.Sleep(60 * time.Second)
+			mu.Lock()
+			now := time.Now()
+			for ip, v := range visitors {
+				if now.Sub(v.windowAt) > window*6 {
+					delete(visitors, ip)
+				}
+			}
+			mu.Unlock()
+		}
+	}()
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Extract client IP (prefer X-Forwarded-For behind reverse proxy).
+		ip := r.Header.Get("X-Forwarded-For")
+		if ip != "" {
+			ip = strings.SplitN(ip, ",", 2)[0]
+			ip = strings.TrimSpace(ip)
+		} else {
+			ip = r.RemoteAddr
+		}
+
+		mu.Lock()
+		v, exists := visitors[ip]
+		now := time.Now()
+		if !exists || now.Sub(v.windowAt) > window {
+			visitors[ip] = &visitor{count: 1, windowAt: now}
+			mu.Unlock()
+		} else {
+			v.count++
+			if v.count > maxRequests {
+				mu.Unlock()
+				w.Header().Set("Retry-After", "10")
+				writeError(w, http.StatusTooManyRequests, "Rate limit exceeded")
+				return
+			}
+			mu.Unlock()
 		}
 
 		next.ServeHTTP(w, r)

@@ -1,0 +1,5 @@
+{{- $name := .Get "name" | default (.Get 0) -}}
+{{- $class := .Get "class" | default "fb-icon" -}}
+{{- $alt := .Get "alt" | default $name -}}
+<img class="{{ $class }}" src="{{ (printf "/images/flowbite/%s.svg" $name) | relURL }}" alt="{{ $alt }}" loading="lazy">
+

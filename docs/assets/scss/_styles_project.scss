@@ -1,0 +1,200 @@
+/*
+ * SeeBOM Docs – Custom styles (applied after Docsy/Bootstrap)
+ * All values taken from seebom-website/static/css/main.css
+ */
+
+/* ── CSS custom properties (same tokens as the website) ────── */
+:root {
+  --sb-bg:             #121218;
+  --sb-surface:        #1c1c24;
+  --sb-surface-alt:    #24242e;
+  --sb-border:         #2e2e38;
+  --sb-accent:         #1A8A8A;
+  --sb-accent-hover:   #147272;
+  --sb-accent-orange:  #E8871E;
+  --sb-accent-orange-rgb: 232, 135, 30;
+  --sb-accent-orange-hover: #D07518;
+  --sb-nav-bg:         #16161e;
+  --sb-nav-link:       #8b8b9a;
+  --sb-nav-link-hover: #f0f0f0;
+  --sb-text:           #e0e0e6;
+  --sb-text-secondary: #9a9aac;
+  --sb-text-muted:     #6b6b7e;
+}
+
+/* ── Dark-mode overrides (Bootstrap 5 data-bs-theme) ───────── */
+[data-bs-theme="dark"] {
+  --bs-body-bg: var(--sb-bg);
+  --bs-body-color: var(--sb-text);
+  --bs-secondary-color: var(--sb-text-secondary);
+  --bs-tertiary-bg: var(--sb-surface);
+  --bs-border-color: var(--sb-border);
+
+  /* Docsy sidebar */
+  .td-sidebar-nav {
+    background: var(--sb-nav-bg);
+  }
+
+  .td-sidebar-link {
+    color: var(--sb-nav-link);
+  }
+
+  .td-sidebar-link:hover,
+  .td-sidebar-link.active {
+    color: var(--sb-accent) !important;
+  }
+
+  /* Docsy navbar */
+  .td-navbar {
+    background: var(--sb-nav-bg) !important;
+    border-bottom: 1px solid var(--sb-border);
+  }
+
+  /* Main content area */
+  .td-main main {
+    background: var(--sb-bg);
+  }
+
+  /* TOC */
+  .td-toc {
+    border-left-color: var(--sb-border);
+  }
+
+  /* Links */
+  a { color: var(--sb-accent); }
+  a:hover { color: var(--sb-accent-hover); }
+
+  /* Code */
+  code { color: var(--sb-accent); }
+
+  pre {
+    background: var(--sb-surface) !important;
+    border: 1px solid var(--sb-border);
+  }
+
+  .highlight pre {
+    background: var(--sb-surface) !important;
+  }
+
+  /* Breadcrumbs */
+  .breadcrumb {
+    --bs-breadcrumb-divider-color: var(--sb-text-muted);
+    --bs-breadcrumb-item-active-color: var(--sb-text-secondary);
+  }
+
+  /* Tables */
+  table {
+    --bs-table-bg: var(--sb-surface);
+    --bs-table-striped-bg: var(--sb-surface-alt);
+    --bs-table-border-color: var(--sb-border);
+    color: var(--sb-text);
+  }
+
+  /* Cards (feature boxes from Docsy shortcodes) */
+  .card {
+    background: linear-gradient(180deg, var(--sb-surface) 0%, var(--sb-surface-alt) 100%);
+    border-color: rgba(232, 135, 30, 0.22);
+  }
+
+  /* Alert / pageinfo boxes */
+  .pageinfo {
+    background: var(--sb-surface-alt);
+    border-color: rgba(232, 135, 30, 0.35);
+  }
+}
+
+/* ── Navbar brand ───────────────────────────────────────────── */
+.td-navbar .navbar-brand {
+  color: var(--sb-accent-orange) !important;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.td-navbar .navbar-brand:hover {
+  color: var(--sb-accent-orange-hover) !important;
+}
+
+/* ── Code blocks ────────────────────────────────────────────── */
+pre code {
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+/* ── Flowbite icon helper ───────────────────────────────────── */
+.fb-icon {
+  width: 1rem;
+  height: 1rem;
+  display: inline-block;
+  object-fit: contain;
+  vertical-align: middle;
+}
+
+.fb-icon-lg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+/* ── Buttons matching seebom-website gradient ───────────────── */
+.btn-seebom {
+  color: #fff !important;
+  background: linear-gradient(120deg, #1A8A8A 0%, #E8871E 100%);
+  box-shadow: 0 0 0 1px rgba(232, 135, 30, 0.22);
+  border: none;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+.btn-seebom:hover {
+  color: #fff !important;
+  background: #147272;
+}
+
+.btn-seebom .fb-icon {
+  filter: brightness(0) invert(1);
+}
+
+/* Secondary button on cover also needs white text */
+.td-cover-block .btn-secondary {
+  color: #fff !important;
+}
+
+.td-cover-block .btn-secondary .fb-icon {
+  filter: brightness(0) invert(1);
+}
+
+/* ── Cover block (homepage) ─────────────────────────────────── */
+.td-cover-block {
+  background: radial-gradient(circle at top, #1b1b27 0%, var(--sb-bg) 45%) !important;
+}
+
+.td-cover-block .lead {
+  color: #e0e0e6 !important;
+}
+
+/* ── Footer ─────────────────────────────────────────────────── */
+[data-bs-theme="dark"] .td-footer {
+  background: var(--sb-surface);
+  border-top: 1px solid var(--sb-border);
+}
+
+.td-footer {
+  padding: 1.5rem 0;
+}
+
+.td-footer .footer-copyright {
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--sb-text-muted);
+  padding: 0.5rem 0;
+}
+
+.td-footer .footer-copyright a {
+  color: var(--sb-accent);
+  text-decoration: none;
+}
+
+.td-footer .footer-copyright a:hover {
+  color: var(--sb-accent-hover);
+  text-decoration: underline;
+}
+

@@ -37,5 +37,10 @@ go.work.sum
 local/
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+
+# Hugo documentation site (build artifacts)
+docs/public/
+docs/resources/
+docs/node_modules/

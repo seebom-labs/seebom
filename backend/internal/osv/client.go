@@ -92,6 +92,11 @@ type Client struct {
 	baseURL    string
 	httpClient *http.Client
 	limiter    *tokenBucket
+
+	// vulnCache is a process-level cache of hydrated vulnerability details.
+	// This prevents fetching the same vuln ID multiple times across SBOMs.
+	vulnCache   map[string]*VulnEntry
+	vulnCacheMu sync.RWMutex
 }
 
 // NewClient creates a new OSV API client with shared rate limiting.
@@ -101,7 +106,8 @@ func NewClient() *Client {
 		httpClient: &http.Client{
 			Timeout: 60 * time.Second,
 		},
-		limiter: getGlobalLimiter(),
+		limiter:   getGlobalLimiter(),
+		vulnCache: make(map[string]*VulnEntry),
 	}
 }
 
@@ -132,10 +138,11 @@ type QueryResult struct {
 
 // VulnEntry represents a single vulnerability from OSV.
 type VulnEntry struct {
-	ID       string     `json:"id"`
-	Summary  string     `json:"summary"`
-	Severity []Severity `json:"severity"`
-	Affected []Affected `json:"affected"`
+	ID               string                 `json:"id"`
+	Summary          string                 `json:"summary"`
+	Severity         []Severity             `json:"severity"`
+	Affected         []Affected             `json:"affected"`
+	DatabaseSpecific map[string]interface{} `json:"database_specific"`
 }
 
 // Severity holds CVSS severity information.
@@ -173,6 +180,8 @@ type Event struct {
 // QueryBatch sends a batch of PURLs to the OSV API and returns the results.
 // PURLs are sent in chunks of maxBatchSize to respect API limits.
 // Includes rate limiting and exponential backoff retry for transient errors.
+// NOTE: The batch endpoint returns minimal data (id + modified only).
+// Use HydrateVulns() to fetch full details (severity, affected, etc.).
 func (c *Client) QueryBatch(ctx context.Context, purls []string) (*BatchResponse, error) {
 	if len(purls) == 0 {
 		return &BatchResponse{}, nil
@@ -261,4 +270,152 @@ func (c *Client) QueryBatch(ctx context.Context, purls []string) (*BatchResponse
 	}
 
 	return nil, fmt.Errorf("OSV API failed after %d retries: %w", maxRetries, lastErr)
+}
+
+// GetVulnerability fetches full vulnerability details from OSV by ID.
+// Unlike QueryBatch, this returns complete data including severity and affected.
+func (c *Client) GetVulnerability(ctx context.Context, id string) (*VulnEntry, error) {
+	if err := c.limiter.Wait(ctx); err != nil {
+		return nil, fmt.Errorf("rate limiter cancelled: %w", err)
+	}
+
+	var lastErr error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			backoff := time.Duration(float64(baseBackoff) * math.Pow(2, float64(attempt-1)))
+			if backoff > 30*time.Second {
+				backoff = 30 * time.Second
+			}
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(backoff):
+			}
+			if err := c.limiter.Wait(ctx); err != nil {
+				return nil, fmt.Errorf("rate limiter cancelled on retry: %w", err)
+			}
+		}
+
+		httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet,
+			c.baseURL+"/v1/vulns/"+id, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create HTTP request: %w", err)
+		}
+
+		resp, err := c.httpClient.Do(httpReq)
+		if err != nil {
+			lastErr = fmt.Errorf("OSV get vulnerability failed: %w", err)
+			continue
+		}
+
+		if resp.StatusCode == http.StatusOK {
+			var entry VulnEntry
+			if decErr := json.NewDecoder(resp.Body).Decode(&entry); decErr != nil {
+				resp.Body.Close()
+				return nil, fmt.Errorf("failed to decode OSV vulnerability: %w", decErr)
+			}
+			resp.Body.Close()
+			return &entry, nil
+		}
+
+		respBody, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusServiceUnavailable {
+			lastErr = fmt.Errorf("OSV API returned status %d: %s", resp.StatusCode, string(respBody))
+			continue
+		}
+
+		return nil, fmt.Errorf("OSV API returned status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	return nil, fmt.Errorf("OSV API failed after %d retries: %w", maxRetries, lastErr)
+}
+
+// HydrateVulns fetches full vulnerability details for a set of vuln IDs.
+// It deduplicates by ID, returns cached entries for previously fetched IDs,
+// and fetches only new IDs concurrently (max 10). Results are cached for
+// the lifetime of the Client so the same vuln is never fetched twice,
+// even across different SBOMs.
+func (c *Client) HydrateVulns(ctx context.Context, ids []string) (map[string]*VulnEntry, error) {
+	// Deduplicate IDs and separate cached vs uncached.
+	result := make(map[string]*VulnEntry, len(ids))
+	var toFetch []string
+
+	c.vulnCacheMu.RLock()
+	for _, id := range ids {
+		if _, done := result[id]; done {
+			continue // duplicate in input
+		}
+		if cached, ok := c.vulnCache[id]; ok {
+			result[id] = cached
+		} else {
+			result[id] = nil // placeholder, will be filled or remain nil
+			toFetch = append(toFetch, id)
+		}
+	}
+	c.vulnCacheMu.RUnlock()
+
+	if len(toFetch) == 0 {
+		if len(result) > 0 {
+			log.Printf("  Hydration: %d IDs all served from cache", len(result))
+		}
+		return result, nil
+	}
+
+	log.Printf("  Hydrating %d new vulnerability IDs (%d cached)...", len(toFetch), len(result)-len(toFetch))
+
+	// Limit concurrency to avoid overwhelming the API.
+	const maxConcurrency = 10
+	sem := make(chan struct{}, maxConcurrency)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	hydrated := 0
+
+	for _, id := range toFetch {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(vulnID string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+
+			entry, err := c.GetVulnerability(ctx, vulnID)
+			if err != nil {
+				log.Printf("  WARNING: Failed to hydrate %s: %v", vulnID, err)
+				return
+			}
+
+			// Store in both the result map and the persistent cache.
+			mu.Lock()
+			result[vulnID] = entry
+			hydrated++
+			if hydrated%100 == 0 {
+				log.Printf("  Hydrated %d/%d vulnerabilities...", hydrated, len(toFetch))
+			}
+			mu.Unlock()
+
+			c.vulnCacheMu.Lock()
+			c.vulnCache[vulnID] = entry
+			c.vulnCacheMu.Unlock()
+		}(id)
+	}
+
+	wg.Wait()
+	log.Printf("  Hydration complete: %d/%d fetched, %d from cache",
+		hydrated, len(toFetch), len(result)-hydrated)
+
+	// Clean nil placeholders for IDs that failed hydration.
+	for id, entry := range result {
+		if entry == nil {
+			delete(result, id)
+		}
+	}
+
+	return result, nil
 }

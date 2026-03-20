@@ -60,6 +60,16 @@ services:
       CLICKHOUSE_PASSWORD: ""
       SBOM_DIR: /data/sboms
       SBOM_LIMIT: ${SBOM_LIMIT:-0}
+      # S3 bucket ingestion (optional – leave empty to use local files only)
+      S3_BUCKETS: ${S3_BUCKETS:-}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_PREFIX: ${S3_PREFIX:-}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+      S3_USE_PATH_STYLE: ${S3_USE_PATH_STYLE:-}
+      S3_USE_SSL: ${S3_USE_SSL:-}
     volumes:
       - ${SBOM_SOURCE_DIR:-./sboms}:/data/sboms:ro
     depends_on:
@@ -87,6 +97,16 @@ services:
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       EXCEPTIONS_FILE: /data/config/license-exceptions.json
       LICENSE_POLICY_FILE: /data/config/license-policy.json
+      # S3 bucket ingestion (worker needs same config to fetch S3 objects)
+      S3_BUCKETS: ${S3_BUCKETS:-}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_PREFIX: ${S3_PREFIX:-}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+      S3_USE_PATH_STYLE: ${S3_USE_PATH_STYLE:-}
+      S3_USE_SSL: ${S3_USE_SSL:-}
     volumes:
       - ${SBOM_SOURCE_DIR:-./sboms}:/data/sboms:ro
       - ./sboms/license-exceptions.json:/data/config/license-exceptions.json:ro
@@ -103,6 +123,7 @@ services:
       - "8090:80"
     volumes:
       - ${CUSTOM_THEME:-./ui/src/assets/custom-theme.example.css}:/usr/share/nginx/html/custom-theme.css:ro
+      - ${UI_CONFIG:-./ui/public/ui-config.json}:/usr/share/nginx/html/ui-config.json:ro
     depends_on:
       - api-gateway
 

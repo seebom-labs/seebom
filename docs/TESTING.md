@@ -56,6 +56,9 @@ backend/internal/
 ├── repo/
 │   ├── scanner.go
 │   └── scanner_test.go         ← tests for Scan (with t.TempDir())
+├── s3/
+│   ├── client.go
+│   └── client_test.go          ← tests for ClassifyKey, ParseURI, ObjectInfo
 ├── spdx/
 │   ├── parser.go
 │   └── parser_test.go          ← tests for Parse (with inline JSON)
@@ -75,18 +78,19 @@ These packages contain only data types (structs) with no logic:
 
 ## Current Test Inventory
 
-| Package | Tests | What's Covered |
-|---------|-------|---------------|
-| `config` | 2 | Default values, custom env vars |
-| `github/purl` | 11 | ExtractGitHubRepo: golang github.com, subpath, pkg:github scheme, non-github, npm, empty, qualifiers, fragments, missing repo, azure submodule, hamba v2 |
-| `github/resolver` | 8 | Resolve (happy path, cache hit, non-GitHub PURL, 404), ResolveWithMetadata (archived repo, license extraction), PreloadCache, CacheEntries |
-| `license` | 26 | Categorize (12 SPDX IDs incl. BSD-3-Clause, ISC, 0BSD), Check, CheckWithExceptions (blanket + package + prefix), LoadPolicy, LoadExceptions, LoadExceptionsWithFallback (4 scenarios), BuildIndex (empty, All CNCF Projects promoted to blanket, compound OR, compound AND), IsExempt substring matching (package+license, package-any), splitLicenses (6 patterns), edge cases |
-| `osv` | 5 | Empty input, mock server, server error, context cancellation, no-vulns response |
-| `osvutil` | 21+ | ClassifySeverity (10 CVSS scenarios), ParseCVSSScore (5 inputs), ExtractFixedVersion (4 scenarios), ExtractAffectedVersions (3 scenarios) |
-| `repo` | 5 | File scanning (SBOM + VEX detection), empty dir, nested dirs, SHA256 consistency, nonexistent dir |
-| `spdx` | 5 | Full parse, invalid JSON, empty packages, deterministic SBOM ID, license fallback |
-| `vex` | 5 (+8 subtests) | Full parse, invalid JSON, empty doc, normalizeVulnID (8 URL patterns), URL-based vuln @id |
-| **Total** | **87+ tests** | |
+| Package | Top-Level | Subtests | What's Covered |
+|---------|-----------|----------|---------------|
+| `config` | 7 | 0 | Default values, custom env vars, S3 buckets JSON, single S3 bucket, shared S3 credentials, invalid S3 JSON, S3BucketNames |
+| `github/purl` | 2 | 15 | ExtractGitHubRepo (11 PURL patterns: golang github.com, subpath, pkg:github scheme, non-github, npm, empty, qualifiers, fragments, missing repo, azure submodule, hamba v2), RepoKey (4 patterns) |
+| `github/resolver` | 11 | 0 | Resolve (happy path, cache hit, non-GitHub PURL), ResolveWithMetadata (archived repo, not-found, non-GitHub, cache hit), PreloadCache, PreloadMetadataCache, CacheEntries, MetadataCacheEntries |
+| `license` | 24 | 20 | Categorize (14 SPDX IDs incl. BSD-3-Clause, ISC, 0BSD, NOASSERTION, NONE), Check, CheckWithExceptions (blanket + package + prefix), LoadPolicy, LoadExceptions, LoadExceptionsWithFallback (4 scenarios), BuildIndex (empty, All CNCF Projects promoted to blanket, compound OR, compound AND), IsExempt substring matching (package+license, package-any), SplitLicenses (7 patterns), GoTempNamesFiltered, edge cases |
+| `osv` | 6 | 0 | Empty input, mock server, server error, context cancellation, no-vulns response, HydrateVulns cache |
+| `osvutil` | 5 | 35 | ClassifySeverity (16 CVSS scenarios incl. vector strings, database-specific fallback), ParseCVSSScore (8 inputs incl. vectors), ComputeCVSSv3BaseScore (4 scenarios), ExtractFixedVersion (4 scenarios), ExtractAffectedVersions (3 scenarios) |
+| `repo` | 5 | 0 | File scanning (SBOM + VEX detection), empty dir, nested dirs, SHA256 consistency, nonexistent dir |
+| `s3` | 4 | 15 | ClassifyKey (9 patterns incl. _spdx.json, case-insensitive), ParseURI (6 patterns), BucketConfig defaults, ObjectInfo URI |
+| `spdx` | 7 | 7 | Full parse, invalid JSON, empty packages, deterministic SBOM ID, license fallback, GoTempModuleName, CleanPackageName (8 patterns) |
+| `vex` | 5 | 8 | Full parse, invalid JSON, empty doc, normalizeVulnID (9 URL patterns), URL-based vuln @id |
+| **Total** | **76** | **100** | **176 test invocations** |
 
 ---
 

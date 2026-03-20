@@ -25,7 +25,7 @@ describe('LicenseOverviewComponent', () => {
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
     const cards = compiled.querySelectorAll('.category-card');
-    expect(cards.length).toBe(3);
+    expect(cards.length).toBe(4);
   });
 });
 

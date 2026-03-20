@@ -165,3 +165,123 @@ func TestParse_LicenseFallback(t *testing.T) {
 		t.Errorf("expected NOASSERTION when both are NOASSERTION, got %s", result.Packages.PackageLicenses[1])
 	}
 }
+
+func TestCleanPackageName(t *testing.T) {
+	tests := []struct {
+		name     string
+		pkgName  string
+		purl     string
+		spdxID   string
+		expected string
+	}{
+		{
+			name:     "normal package name unchanged",
+			pkgName:  "github.com/foo/bar",
+			purl:     "pkg:golang/github.com/foo/bar@v1.0.0",
+			spdxID:   "SPDXRef-Package-bar",
+			expected: "github.com/foo/bar",
+		},
+		{
+			name:     "go temp name replaced by PURL",
+			pkgName:  "tmp.ej9m9OiO2V",
+			purl:     "pkg:golang/github.com/cncf/xds/go@v0.0.0-20240905190251-b4127c9b8d78",
+			spdxID:   "SPDXRef-Package-go",
+			expected: "github.com/cncf/xds/go",
+		},
+		{
+			name:     "go temp name replaced by npm PURL",
+			pkgName:  "tmp.AbCdEfGhIj",
+			purl:     "pkg:npm/lodash@4.17.21",
+			spdxID:   "SPDXRef-Package-lodash",
+			expected: "lodash",
+		},
+		{
+			name:     "go temp name falls back to SPDX ID",
+			pkgName:  "tmp.XyZ123AbCd",
+			purl:     "",
+			spdxID:   "SPDXRef-Package-my-module",
+			expected: "my-module",
+		},
+		{
+			name:     "go temp name with only SPDXRef prefix",
+			pkgName:  "tmp.AAAAAA",
+			purl:     "",
+			spdxID:   "SPDXRef-RootPackage",
+			expected: "RootPackage",
+		},
+		{
+			name:     "go temp name no PURL no useful SPDX ID",
+			pkgName:  "tmp.AAAAAA",
+			purl:     "",
+			spdxID:   "",
+			expected: "tmp.AAAAAA",
+		},
+		{
+			name:     "short tmp not matched (too short)",
+			pkgName:  "tmp.abc",
+			purl:     "pkg:npm/test@1.0",
+			spdxID:   "",
+			expected: "tmp.abc",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := cleanPackageName(tc.pkgName, tc.purl, tc.spdxID)
+			if got != tc.expected {
+				t.Errorf("cleanPackageName(%q, %q, %q) = %q, want %q",
+					tc.pkgName, tc.purl, tc.spdxID, got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestParse_GoTempModuleName(t *testing.T) {
+	doc := `{
+		"spdxVersion": "SPDX-2.3",
+		"name": "go-project",
+		"documentNamespace": "https://example.com/go-project",
+		"creationInfo": {"created": "2025-06-01T00:00:00Z", "creators": ["Tool: bom-1.0"]},
+		"packages": [
+			{
+				"SPDXID": "SPDXRef-Package-go",
+				"name": "tmp.ej9m9OiO2V",
+				"versionInfo": "",
+				"licenseConcluded": "Apache-2.0",
+				"licenseDeclared": "Apache-2.0",
+				"externalRefs": [
+					{
+						"referenceCategory": "PACKAGE-MANAGER",
+						"referenceType": "purl",
+						"referenceLocator": "pkg:golang/github.com/cncf/xds/go@v0.0.0-20240905"
+					}
+				]
+			},
+			{
+				"SPDXID": "SPDXRef-Package-real",
+				"name": "github.com/real/package",
+				"versionInfo": "1.2.3",
+				"licenseConcluded": "MIT",
+				"licenseDeclared": "MIT",
+				"externalRefs": []
+			}
+		],
+		"relationships": []
+	}`
+
+	result, err := Parse(strings.NewReader(doc), "go.spdx.json", "hash-go")
+	if err != nil {
+		t.Fatalf("Parse() error: %v", err)
+	}
+
+	if result.Packages.PackageNames[0] == "tmp.ej9m9OiO2V" {
+		t.Errorf("expected Go temp name to be cleaned, got %s", result.Packages.PackageNames[0])
+	}
+	if result.Packages.PackageNames[0] != "github.com/cncf/xds/go" {
+		t.Errorf("expected github.com/cncf/xds/go, got %s", result.Packages.PackageNames[0])
+	}
+	// Normal package should be unchanged.
+	if result.Packages.PackageNames[1] != "github.com/real/package" {
+		t.Errorf("expected github.com/real/package, got %s", result.Packages.PackageNames[1])
+	}
+}

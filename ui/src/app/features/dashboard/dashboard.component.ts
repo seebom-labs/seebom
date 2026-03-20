@@ -1,8 +1,10 @@
-import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef, SecurityContext } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
+import { DomSanitizer } from '@angular/platform-browser';
 import { ApiService } from '../../core/api.service';
 import { DashboardStats } from '../../core/api.models';
+import { SiteConfigService } from '../../core/site-config.service';
 import { DonutChartComponent, DonutSegment } from '../../shared/charts/donut-chart.component';
 import { HorizontalBarChartComponent, BarItem } from '../../shared/charts/horizontal-bar-chart.component';
 
@@ -14,9 +16,13 @@ import { HorizontalBarChartComponent, BarItem } from '../../shared/charts/horizo
   template: `
     <div class="dashboard">
       <header class="dash-header">
-        <h1>Dashboard</h1>
-        <p class="subtitle">Software Bill of Materials — Governance Overview</p>
+        <h1>{{ dashTitle }}</h1>
+        <p class="subtitle">{{ dashSubtitle }}</p>
       </header>
+
+      <section class="description-banner">
+        <p class="description-text" [innerHTML]="dashDescription"></p>
+      </section>
 
       @if (stats) {
         <div class="kpi-row">
@@ -29,8 +35,13 @@ import { HorizontalBarChartComponent, BarItem } from '../../shared/charts/horizo
             <span class="kpi-label">Packages</span>
           </div>
           <div class="kpi-card warn">
-            <span class="kpi-value">{{ stats.effective_vulnerabilities }}</span>
-            <span class="kpi-label">Effective Vulns</span>
+            @if (stats.total_vex_statements > 0) {
+              <span class="kpi-value">{{ stats.effective_vulnerabilities }}</span>
+              <span class="kpi-label">Effective Vulns</span>
+            } @else {
+              <span class="kpi-value">{{ stats.total_vulnerabilities }}</span>
+              <span class="kpi-label">Total Vulns</span>
+            }
           </div>
           <div class="kpi-card ok">
             <span class="kpi-value">{{ stats.suppressed_by_vex }}</span>
@@ -57,7 +68,15 @@ import { HorizontalBarChartComponent, BarItem } from '../../shared/charts/horizo
           </div>
           <div class="chart-card">
             <h3>VEX Effectiveness</h3>
-            <app-donut-chart [segments]="vexSegments" centerLabel="Total" />
+            @if (stats.total_vex_statements > 0) {
+              <app-donut-chart [segments]="vexSegments" centerLabel="Total" />
+            } @else {
+              <div class="empty-vex">
+                <span class="empty-vex-icon">📄</span>
+                <p class="empty-vex-title">No VEX Data</p>
+                <p class="empty-vex-hint">Add <code>.openvex.json</code> files to suppress non-applicable vulnerabilities.</p>
+              </div>
+            }
           </div>
         </div>
 
@@ -97,6 +116,10 @@ import { HorizontalBarChartComponent, BarItem } from '../../shared/charts/horizo
           <a routerLink="/license-compliance" class="quick-link">License Compliance <span class="arrow">→</span></a>
           <a routerLink="/cve-impact" class="quick-link">CVE Impact Search <span class="arrow">→</span></a>
         </div>
+
+        <section class="disclaimer">
+          <p [innerHTML]="dashDisclaimer"></p>
+        </section>
       } @else {
         <div class="loading-state">
           <div class="spinner"></div>
@@ -110,6 +133,17 @@ import { HorizontalBarChartComponent, BarItem } from '../../shared/charts/horizo
     .dash-header { margin-bottom: 24px; }
     .dash-header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
     .subtitle { margin-top: 2px; color: var(--text-secondary); font-size: 0.8rem; }
+
+    .description-banner {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+      padding: 16px 20px; margin-bottom: 24px;
+    }
+    .description-text {
+      margin: 0; font-size: 0.82rem; line-height: 1.65; color: var(--text-secondary);
+    }
+    .description-text strong { color: var(--text); }
+    .description-text a { color: var(--accent); text-decoration: none; font-weight: 500; }
+    .description-text a:hover { text-decoration: underline; }
 
     .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
     .kpi-card {
@@ -161,6 +195,22 @@ import { HorizontalBarChartComponent, BarItem } from '../../shared/charts/horizo
     .warning-text a { color: var(--accent); font-weight: 600; margin-left: 8px; }
     .warning-text a:hover { text-decoration: underline; }
 
+    .empty-vex { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 32px 16px; text-align: center; }
+    .empty-vex-icon { font-size: 2rem; opacity: 0.5; }
+    .empty-vex-title { font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin: 0; }
+    .empty-vex-hint { font-size: 0.72rem; color: var(--text-muted); margin: 0; line-height: 1.5; }
+    .empty-vex-hint code { background: var(--border); padding: 1px 5px; border-radius: 3px; font-size: 0.7rem; }
+
+    .disclaimer {
+      margin-top: 24px; padding: 14px 18px;
+      background: color-mix(in srgb, var(--text-muted) 8%, transparent);
+      border: 1px solid var(--border); border-radius: 4px;
+    }
+    .disclaimer p {
+      margin: 0; font-size: 0.72rem; line-height: 1.6; color: var(--text-muted);
+    }
+    .disclaimer strong { color: var(--text-secondary); }
+
     .loading-state { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 80px 0; color: var(--text-muted); }
     .spinner {
       width: 28px; height: 28px; border: 2px solid #e5e7eb; border-top-color: var(--accent);
@@ -177,9 +227,27 @@ export class DashboardComponent implements OnInit {
   severityBars: BarItem[] = [];
   licenseBars: BarItem[] = [];
 
-  constructor(private readonly api: ApiService, private readonly cdr: ChangeDetectorRef) {}
+  dashTitle = '';
+  dashSubtitle = '';
+  dashDescription = '';
+  dashDisclaimer = '';
+
+  constructor(
+    private readonly api: ApiService,
+    private readonly cdr: ChangeDetectorRef,
+    private readonly siteConfig: SiteConfigService,
+    private readonly sanitizer: DomSanitizer,
+  ) {}
 
   ngOnInit(): void {
+    const dc = this.siteConfig.dashboard;
+    this.dashTitle = dc.title;
+    this.dashSubtitle = dc.subtitle;
+    // Use Angular's built-in sanitizer: strips <script>, event handlers, etc.
+    // but preserves safe formatting tags (<strong>, <a>, <em>, <code>).
+    this.dashDescription = this.sanitizer.sanitize(SecurityContext.HTML, dc.description) ?? '';
+    this.dashDisclaimer = this.sanitizer.sanitize(SecurityContext.HTML, dc.disclaimer) ?? '';
+
     this.api.getDashboardStats().subscribe((data) => {
       this.stats = data;
       this.buildCharts(data);
@@ -205,10 +273,12 @@ export class DashboardComponent implements OnInit {
     ];
     this.licenseBars = [...this.licenseSegments];
 
-    this.vexSegments = [
-      { label: 'Effective', value: s.effective_vulnerabilities, color: '#E8871E' },
-      { label: 'Suppressed', value: s.suppressed_by_vex, color: '#0D6B5E' },
-    ];
+    this.vexSegments = s.total_vex_statements > 0
+      ? [
+          { label: 'Effective', value: s.effective_vulnerabilities, color: '#E8871E' },
+          { label: 'Suppressed', value: s.suppressed_by_vex, color: '#0D6B5E' },
+        ]
+      : [];
   }
 }
 

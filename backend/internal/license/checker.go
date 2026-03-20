@@ -3,11 +3,16 @@ package license
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 
 	json "github.com/goccy/go-json"
 )
+
+// goTempNameRe matches Go temporary module directory names that may have
+// slipped through the SPDX parser cleanup (e.g. "tmp.ej9m9OiO2V").
+var goTempNameRe = regexp.MustCompile(`^tmp\.[a-zA-Z0-9]{6,}$`)
 
 // Category represents a license compliance category.
 type Category string
@@ -184,6 +189,13 @@ func CheckWithExceptions(packageNames, packageLicenses []string, exceptions *Exc
 		name := ""
 		if i < len(packageNames) {
 			name = packageNames[i]
+		}
+
+		// Skip Go temporary build directory names (e.g. "tmp.ej9m9OiO2V") –
+		// these are artifacts of CI/CD builds captured by SBOM generators and
+		// not real package identifiers.
+		if goTempNameRe.MatchString(name) {
+			continue
 		}
 
 		cat := Categorize(lic)

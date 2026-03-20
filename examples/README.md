@@ -11,9 +11,10 @@ This directory contains ready-to-use example configurations for deploying SeeBOM
 
 | Method | Config | Best For |
 |--------|--------|----------|
-| **Seed job** | `gitSync.enabled: false` + `seedJob` | Large repos (cncf/sbom ~14 GB), one-time clone into PVC |
-| **git-sync** | `gitSync.enabled: true` | Small repos (< 1 GB), continuous auto-pull |
-| **Manual PVC** | `gitSync.enabled: false`, no seedJob | Custom CI, S3/GCS sources, pre-built SBOMs |
+| **S3 buckets** (default) | `s3.buckets` JSON array | Any scale, no PVC needed, AWS/MinIO/GCS |
+| **Seed job** (alternative) | `gitSync.enabled: false` + `seedJob` | Large Git repos (cncf/sbom ~14 GB), environments without S3 |
+| **git-sync** (alternative) | `gitSync.enabled: true` | Small Git repos (< 1 GB), continuous auto-pull |
+| **Manual PVC** (alternative) | `gitSync.enabled: false`, no seedJob | Custom CI, pre-built SBOMs |
 
 See [`kubernetes/README.md`](kubernetes/README.md) for full details on each method.
 

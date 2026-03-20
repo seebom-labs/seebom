@@ -14,7 +14,15 @@ data:
   API_PORT: {{ .Values.apiGateway.port | quote }}
   WORKER_BATCH_SIZE: {{ .Values.parsingWorker.batchSize | quote }}
   SKIP_OSV: {{ .Values.parsingWorker.skipOSV | quote }}
+  SKIP_GITHUB_RESOLVE: {{ .Values.parsingWorker.skipGitHubResolve | quote }}
   SBOM_LIMIT: {{ .Values.ingestionWatcher.sbomLimit | quote }}
   EXCEPTIONS_FILE: {{ .Values.licenseExceptions.mountPath | quote }}
   LICENSE_POLICY_FILE: {{ .Values.licensePolicy.mountPath | quote }}
+  {{- if .Values.s3.buckets }}
+  {{- if kindIs "string" .Values.s3.buckets }}
+  S3_BUCKETS: {{ .Values.s3.buckets | quote }}
+  {{- else }}
+  S3_BUCKETS: {{ .Values.s3.buckets | toJson | quote }}
+  {{- end }}
+  {{- end }}
 

@@ -1,15 +1,13 @@
 # SeeBOM – Production Helm Values
 #
 # Suitable for a real Kubernetes cluster (EKS, GKE, AKS, self-hosted).
-# Uses a seed job to clone SBOMs into a PVC (more reliable than git-sync for
-# large repos like cncf/sbom at ~14 GB). HA replicas, ClusterIP services.
-#
-# For small SBOM repos (< 1 GB), see values-minimal.yaml which uses git-sync.
+# Default ingestion: S3 buckets (set s3.buckets). Fallback: seed job into PVC.
+# HA replicas, ClusterIP services.
 #
 # Usage:
 #   helm install seebom deploy/helm/seebom/ -n seebom -f values-production.yaml \
 #     --set clickhouse.password=<PASSWORD> \
-#     --set github.token=<GITHUB_PAT>
+#     --set 's3.buckets=[{"name":"cncf-subproject-sboms","region":"us-east-1"}]'
 
 # ─── Images ──────────────────────────────────────────────────────────────────
 image:
@@ -47,14 +45,19 @@ clickhouse:
 github:
   token: ""   # pass via --set or reference an existing K8s Secret
 
-# ─── SBOM Source (seed job) ──────────────────────────────────────────────────
+# ─── S3 Bucket Ingestion (default, recommended) ─────────────────────────────
+# Ingest SBOMs directly from S3 buckets. No PVC, git-sync, or seed job needed.
+# Works alongside local files if both are configured.
+s3:
+  # Example: ingest from two public CNCF SBOM buckets
+  # buckets: '[{"name":"cncf-subproject-sboms","region":"us-east-1"},{"name":"cncf-project-sboms","region":"us-east-1"}]'
+  buckets: ""
+  accessKey: ""   # pass via --set for private buckets
+  secretKey: ""   # pass via --set for private buckets
+
+# ─── SBOM Source via PVC (alternative to S3) ─────────────────────────────────
 # The seed job does a shallow git clone into a PVC on first install.
-# This is more reliable than git-sync for large repos (e.g. cncf/sbom ~14 GB)
-# because git-sync's sidecar model struggles with multi-gigabyte repos.
-#
-# To refresh SBOMs later, delete the seed job and re-run:
-#   kubectl delete job -n seebom -l app.kubernetes.io/component=seed-sboms
-#   helm upgrade seebom ...
+# Only needed if S3 is not available. For S3-based ingestion, set s3.buckets above.
 gitSync:
   enabled: false
 
@@ -100,6 +103,7 @@ parsingWorker:
   replicas: 5                # scale up for faster processing
   batchSize: 50
   skipOSV: false
+  skipGitHubResolve: false
   resources:
     requests: { cpu: 250m, memory: 512Mi }
     limits:   { cpu: "1", memory: 1Gi }
@@ -125,6 +129,8 @@ ui:
     requests: { cpu: 50m, memory: 64Mi }
     limits:   { cpu: 200m, memory: 128Mi }
   customTheme:
+    enabled: false
+  siteConfig:
     enabled: false
 
 # ─── CVE Refresher ──────────────────────────────────────────────────────────

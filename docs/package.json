@@ -1,0 +1,16 @@
+{
+  "name": "seebom-docs",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SeeBOM documentation site",
+  "scripts": {
+    "serve": "hugo server --buildDrafts --buildFuture",
+    "build": "hugo --minify"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "postcss-cli": "^11.0.0"
+  }
+}
+

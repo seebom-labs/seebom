@@ -1,8 +1,14 @@
-# 🔍 SeeBOM Labs
+<p align="center">
+  <img src="docs/static/images/logo-with-text.png" alt="SeeBOM" width="400">
+</p>
 
-**Kubernetes-native Software Bill of Materials (SBOM) Visualization & Governance Platform**
+<h3 align="center">Kubernetes-native Software Bill of Materials (SBOM) Visualization & Governance Platform</h3>
 
 Ingest 1000+ SPDX SBOMs, scan for vulnerabilities via OSV, enforce license compliance, and apply VEX statements — all visualized in a fast Angular dashboard backed by ClickHouse analytics.
+
+<p align="center">
+  <img src="docs/static/images/dashboard-screenshot.png" alt="SeeBOM Dashboard" width="900">
+</p>
 
 ---
 
@@ -58,6 +64,14 @@ cp .env.example .env
 | `SKIP_OSV` | `false` | Skip OSV vulnerability API calls. Set `true` for fast initial bulk load (licenses only), then re-run with `false`. |
 | `SKIP_GITHUB_RESOLVE` | `false` | Skip GitHub license resolution for packages with `NOASSERTION`/empty licenses. |
 | `GITHUB_TOKEN` | *(empty)* | GitHub personal access token for license resolution. Increases rate limit from 60 to 5000 req/h. No scopes needed. |
+| `CUSTOM_THEME` | (example file) | Path to a custom CSS theme file for the UI. See "Custom Theme" section. |
+| `UI_CONFIG` | `./ui/public/ui-config.json` | Path to a JSON file with UI text overrides (brand name, dashboard texts, disclaimer). See "Site Configuration" section. |
+| `S3_BUCKETS` | *(empty)* | JSON array of S3 bucket configs. See "S3 Ingestion" section. |
+| `S3_BUCKET` | *(empty)* | Single S3 bucket name (simpler alternative to `S3_BUCKETS`). |
+| `S3_ENDPOINT` | `s3.amazonaws.com` | S3 endpoint URL. |
+| `S3_REGION` | `us-east-1` | AWS region. |
+| `S3_ACCESS_KEY` | *(empty)* | Shared S3 access key (applied to all buckets). Leave empty for public buckets. |
+| `S3_SECRET_KEY` | *(empty)* | Shared S3 secret key. |
 
 **After changing `.env`:**
 
@@ -122,6 +136,100 @@ kubectl rollout restart deployment seebom-ui
 ```
 
 See `ui/src/assets/custom-theme.example.css` for all available variables.
+
+### Site Configuration (Texts & Branding)
+
+All UI text content (brand name, page title, dashboard description, disclaimer, etc.) can be customised **without rebuilding** Angular via a `ui-config.json` file.
+
+**Local (Docker Compose):** Edit the default file directly or point to your own:
+
+```bash
+# Option 1: Edit the built-in default
+vim ui/public/ui-config.json
+
+# Option 2: Use a custom file via .env
+UI_CONFIG=./my-ui-config.json
+docker compose up -d --force-recreate ui
+```
+
+**Example `ui-config.json`:**
+
+```json
+{
+  "brandName": "My SBOM Platform",
+  "pageTitle": "My SBOM Platform",
+  "dashboard": {
+    "title": "Overview",
+    "subtitle": "Software Supply Chain Governance",
+    "description": "<strong>Welcome</strong> to our internal SBOM governance platform.",
+    "disclaimer": "Internal use only. Data sourced from OSV and GitHub."
+  },
+  "footer": {
+    "enabled": true,
+    "text": "© 2026 My Company"
+  }
+}
+```
+
+All fields are optional — any missing key falls back to the built-in SeeBOM default. HTML is supported in `description` and `disclaimer`.
+
+**Kubernetes:** Enable the site config in Helm values:
+
+```yaml
+ui:
+  siteConfig:
+    enabled: true
+    content:
+      brandName: "My SBOM Platform"
+      pageTitle: "My SBOM Platform"
+      dashboard:
+        title: "Overview"
+        subtitle: "Software Supply Chain Governance"
+        description: "<strong>Welcome</strong> to our SBOM platform."
+        disclaimer: "Internal use only."
+```
+
+Changes take effect after a pod restart (`kubectl rollout restart deployment seebom-ui`). No rebuild needed.
+
+### S3 Ingestion (Default)
+
+Ingest SBOMs directly from S3-compatible buckets (AWS S3, MinIO, GCS). This is the default and recommended ingestion method — no volumes, PVCs, or git-sync needed.
+
+**Single bucket:**
+
+```bash
+# .env
+S3_BUCKET=cncf-subproject-sboms
+S3_ENDPOINT=s3.amazonaws.com
+S3_REGION=us-east-1
+```
+
+**Multiple buckets (JSON array):**
+
+```bash
+# .env
+S3_BUCKETS='[{"name":"cncf-subproject-sboms","endpoint":"s3.amazonaws.com","region":"us-east-1"},{"name":"cncf-project-sboms","region":"us-east-1"}]'
+```
+
+**Private buckets with credentials:**
+
+```bash
+# .env (shared credentials for all buckets)
+S3_ACCESS_KEY=AKIA...
+S3_SECRET_KEY=...
+S3_BUCKETS='[{"name":"my-private-bucket"}]'
+
+# Or per-bucket credentials in JSON:
+S3_BUCKETS='[{"name":"my-bucket","accessKey":"AKIA...","secretKey":"..."}]'
+```
+
+**How it works:**
+- The Ingestion Watcher streams `ListObjects` from each bucket (paginated, no full listing in memory)
+- Files are classified by extension: `*.spdx.json` / `*_spdx.json` → SBOM, `*.openvex.json` / `*.vex.json` → VEX
+- SHA256 hashes are computed by streaming the object (not loaded into memory)
+- Jobs are enqueued in batches of 500 for efficient ClickHouse inserts
+- The Parsing Worker fetches S3 objects on-demand via `s3://bucket/key` URIs
+- Local filesystem ingestion (from `SBOM_SOURCE_DIR`) still works alongside S3
 
 ```bash
 # After editing config files:
@@ -212,7 +320,7 @@ sboms/*.spdx.json + *.openvex.json
              │
              ▼
 ┌─────────────────────────┐
-│   API Gateway           │  17 REST endpoints, stateless
+│   API Gateway           │  16 REST endpoints, stateless
 │   (Go binary)           │
 └────────────┬────────────┘
              │
@@ -248,7 +356,10 @@ See [docs/TESTING.md](docs/TESTING.md) for writing and running tests.
 | `make migrate` | Run all pending database migrations |
 | **Kind (Local Kubernetes)** | |
 | `make kind-up` | Create Kind cluster and deploy SeeBOM via Helm |
-| `make kind-down` | Destroy the Kind cluster |
+| `make kind-down` | Destroy the Kind cluster (deletes everything) |
+| `make kind-stop` | Stop the Kind cluster without losing data (preserves volumes) |
+| `make kind-start` | Resume a stopped Kind cluster (all pods & data intact) |
+| `make kind-status` | Show Kind cluster and pod status |
 | `make kind-build` | Build all container images and load them into Kind |
 | `make kind-deploy` | Build images, Helm upgrade, and restart pods |
 | `make kind-reingest` | Re-ingest all SBOMs (truncate data, re-queue, no re-download) |
@@ -286,7 +397,7 @@ See [docs/TESTING.md](docs/TESTING.md) for writing and running tests.
 | GET | `/api/v1/vulnerabilities?page=&vex_filter=` | Paginated vulnerabilities (optional: `vex_filter=effective`) |
 | GET | `/api/v1/vulnerabilities/{id}/affected-projects` | All projects affected by a CVE |
 | GET | `/api/v1/licenses/compliance` | Global license compliance overview |
-| GET | `/api/v1/projects/license-violations` | Projects with license violations (filtered by exceptions) |
+| GET | `/api/v1/projects/license-compliance` | Projects with license violations (filtered by exceptions) |
 | GET | `/api/v1/license-exceptions` | Active license exceptions (read-only, from config file) |
 | GET | `/api/v1/license-policy` | Active license classification policy (permissive/copyleft lists) |
 | GET | `/api/v1/vex/statements?page=&page_size=` | Paginated VEX statements |
@@ -357,7 +468,7 @@ kubectl edit configmap seebom-license-policy -n seebom
 
 | Layer | Technology |
 |-------|-----------|
-| Backend | Go 1.24, net/http (stdlib) |
+| Backend | Go 1.25, net/http (stdlib) |
 | Database | ClickHouse (MergeTree family) |
 | Frontend | Angular 19, CDK Virtual Scrolling |
 | Vuln Scanning | OSV.dev API |

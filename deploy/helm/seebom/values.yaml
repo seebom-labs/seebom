@@ -11,6 +11,20 @@ image:
 github:
   token: ""
 
+# S3 bucket ingestion (default, recommended)
+# Ingest SBOMs directly from S3-compatible buckets (AWS S3, MinIO, GCS).
+# No PVC, git-sync, or seed job required. Streams object listings with pagination.
+# The Parsing Workers fetch objects on-demand via s3:// URIs.
+# Set s3.buckets to a JSON array of bucket configs. Leave empty to use volume-based alternatives.
+s3:
+  # JSON array of bucket configs. Injected as S3_BUCKETS env var.
+  # Example: [{"name":"cncf-subproject-sboms","region":"us-east-1"},{"name":"cncf-project-sboms","region":"us-east-1"}]
+  buckets: ""
+  # Shared credentials (applied to all buckets without their own keys).
+  # For public buckets, leave empty.
+  accessKey: ""
+  secretKey: ""
+
 # ClickHouse (provisioned via ClickHouse Operator)
 clickhouse:
   host: chi-seebom-clickhouse-seebom-cluster-0-0
@@ -40,14 +54,14 @@ clickhouse:
       dataStorage: 1Gi
       logStorage: 100Mi
 
-# SBOM source (PVC populated by git-sync sidecar)
+# SBOM source via PVC (alternative to S3, for environments without S3 access)
 sbomSource:
   pvcName: seebom-sbom-data
   mountPath: /data/sboms
   storageSize: 1Gi
 
-# git-sync: automatically pulls SBOMs from a Git repository into the PVC.
-# Runs as an initContainer on the watcher + sidecar on workers.
+# git-sync: alternative to S3 — pulls SBOMs from a Git repository into a PVC.
+# Only suitable for small repos (< 1 GB). For large-scale ingestion, use S3 instead.
 gitSync:
   enabled: true
   image: registry.k8s.io/git-sync/git-sync:v4.4.0
@@ -87,6 +101,7 @@ parsingWorker:
   replicas: 5
   batchSize: 50
   skipOSV: false            # Set to true for fast initial bulk load
+  skipGitHubResolve: false  # Skip GitHub license resolution for unknown licenses
   resources:
     requests:
       cpu: 250m
@@ -127,6 +142,21 @@ ui:
   # Edit the ConfigMap to rebrand the UI without rebuilding.
   customTheme:
     enabled: false
+  # Site configuration – override brand name, dashboard texts, disclaimer etc.
+  # All text fields support HTML. Edit via Helm values or kubectl edit configmap.
+  siteConfig:
+    enabled: false
+    content:
+      brandName: "SeeBOM"
+      pageTitle: "SeeBOM"
+      dashboard:
+        title: "Dashboard"
+        subtitle: "Software Bill of Materials — Governance Overview"
+        description: '<strong>SeeBOM</strong> autonomously ingests SPDX SBOMs from the CNCF ecosystem, cross-references known vulnerabilities via the <a href="https://osv.dev" target="_blank" rel="noopener">OSV database</a>, evaluates license compliance against a configurable policy, and applies <a href="https://openvex.dev" target="_blank" rel="noopener">OpenVEX</a> statements to suppress non-applicable findings — giving you a single pane of glass for software supply-chain governance.'
+        disclaimer: '<strong>Disclaimer:</strong> The data shown on this dashboard is provided on an "as-is" basis for informational purposes only. Vulnerability and license information is sourced from third-party databases (OSV, GitHub) and may be incomplete or delayed. SeeBOM does not guarantee the accuracy, completeness, or timeliness of any data and is not a substitute for professional security audits or legal advice. Use at your own risk.'
+      footer:
+        enabled: false
+        text: ""
 
 # CVE Refresher (CronJob) – checks all known PURLs for newly disclosed CVEs.
 cveRefresher:

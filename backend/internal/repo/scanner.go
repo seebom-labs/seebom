@@ -13,11 +13,14 @@ import (
 
 // FileInfo holds metadata about a discovered file.
 type FileInfo struct {
-	// RelPath is the path relative to the root directory.
+	// RelPath is the path relative to the root directory (local files)
+	// or the S3 object key (S3 files).
 	RelPath    string
 	AbsPath    string
 	SHA256Hash string
 	FileType   string // "sbom" or "vex"
+	SourceType string // "local" or "s3" (empty defaults to "local")
+	SourceURI  string // For S3: "s3://bucket/key". Empty for local files.
 }
 
 // Scanner walks a directory to discover SPDX JSON files and compute their hashes.

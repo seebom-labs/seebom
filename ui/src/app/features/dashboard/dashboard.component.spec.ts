@@ -24,7 +24,7 @@ describe('DashboardComponent', () => {
     const fixture = TestBed.createComponent(DashboardComponent);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('.loading')?.textContent).toContain('Loading');
+    expect(compiled.querySelector('.loading-state')?.textContent).toContain('Loading');
   });
 });
 

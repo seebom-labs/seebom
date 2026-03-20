@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	json "github.com/goccy/go-json"
@@ -11,6 +13,10 @@ import (
 
 	"github.com/seebom-labs/seebom/backend/pkg/models"
 )
+
+// goTempModuleRe matches Go temporary module directory names like "tmp.ej9m9OiO2V".
+// These appear in SPDX data when Go SBOM tools capture the temp build directory as a package name.
+var goTempModuleRe = regexp.MustCompile(`^tmp\.[a-zA-Z0-9]{6,}$`)
 
 // SPDXDocument represents the top-level structure of an SPDX 2.3 JSON document.
 // We only extract the fields we need for ingestion.
@@ -70,6 +76,40 @@ func ParseFile(path, sourceFile, sha256Hash string) (*ParseResult, error) {
 	return Parse(f, sourceFile, sha256Hash)
 }
 
+// cleanPackageName replaces Go temporary build directory names (e.g. "tmp.ej9m9OiO2V")
+// with a meaningful name derived from the PURL or SPDX ID.
+// These temp names are artifacts of Go CI/CD builds captured by SBOM generators.
+func cleanPackageName(name, purl, spdxID string) string {
+	if !goTempModuleRe.MatchString(name) {
+		return name
+	}
+
+	// Try to derive a useful name from the PURL (e.g. "pkg:golang/github.com/foo/bar@v1.0" → "github.com/foo/bar").
+	if purl != "" {
+		// Strip "pkg:<type>/" prefix.
+		if idx := strings.Index(purl, "/"); idx >= 0 {
+			cleaned := purl[idx+1:]
+			// Strip version suffix (@...).
+			if atIdx := strings.LastIndex(cleaned, "@"); atIdx >= 0 {
+				cleaned = cleaned[:atIdx]
+			}
+			if cleaned != "" {
+				return cleaned
+			}
+		}
+	}
+
+	// Fall back to SPDX ID (e.g. "SPDXRef-Package-foo" → "foo").
+	if strings.HasPrefix(spdxID, "SPDXRef-Package-") {
+		return strings.TrimPrefix(spdxID, "SPDXRef-Package-")
+	}
+	if strings.HasPrefix(spdxID, "SPDXRef-") {
+		return strings.TrimPrefix(spdxID, "SPDXRef-")
+	}
+
+	return name
+}
+
 // Parse reads an SPDX JSON document from a reader and extracts models.
 func Parse(r io.Reader, sourceFile, sha256Hash string) (*ParseResult, error) {
 	var doc SPDXDocument
@@ -123,10 +163,8 @@ func Parse(r io.Reader, sourceFile, sha256Hash string) (*ParseResult, error) {
 		spdxIDToIndex[pkg.SPDXID] = idx
 
 		spdxIDs = append(spdxIDs, pkg.SPDXID)
-		names = append(names, pkg.Name)
-		versions = append(versions, pkg.VersionInfo)
 
-		// Find PURL from external references.
+		// Find PURL from external references (needed before name cleaning).
 		purl := ""
 		for _, ref := range pkg.ExternalRefs {
 			if ref.ReferenceType == "purl" {
@@ -135,6 +173,11 @@ func Parse(r io.Reader, sourceFile, sha256Hash string) (*ParseResult, error) {
 			}
 		}
 		purls = append(purls, purl)
+
+		// Clean up Go temp build directory names (e.g. "tmp.ej9m9OiO2V").
+		name := cleanPackageName(pkg.Name, purl, pkg.SPDXID)
+		names = append(names, name)
+		versions = append(versions, pkg.VersionInfo)
 
 		// Prefer declared license, fall back to concluded.
 		lic := pkg.LicenseDeclared

@@ -1,11 +1,26 @@
 import { TestBed } from '@angular/core/testing';
 import { RouterModule } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { App } from './app';
 
 describe('App', () => {
   beforeEach(async () => {
+    // Ensure localStorage is available in test env
+    if (typeof localStorage === 'undefined' || !localStorage.getItem) {
+      Object.defineProperty(globalThis, 'localStorage', {
+        value: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+        writable: true,
+      });
+    }
+    // Ensure matchMedia is available in test env
+    if (typeof window !== 'undefined' && !window.matchMedia) {
+      window.matchMedia = () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} } as any);
+    }
+
     await TestBed.configureTestingModule({
       imports: [App, RouterModule.forRoot([])],
+      providers: [provideHttpClient(), provideHttpClientTesting()],
     }).compileComponents();
   });
 
