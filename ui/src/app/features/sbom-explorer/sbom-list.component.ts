@@ -1,8 +1,10 @@
-import { Component, OnInit, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ScrollingModule } from '@angular/cdk/scrolling';
 import { RouterModule } from '@angular/router';
+import { Subject } from 'rxjs';
+import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 import { ApiService } from '../../core/api.service';
 import { SBOMListItem } from '../../core/api.models';
 
@@ -15,21 +17,25 @@ import { SBOMListItem } from '../../core/api.models';
     <div class="sbom-list">
       <div class="list-header">
         <h1>SBOM Explorer</h1>
-        <span class="result-count" *ngIf="allSboms.length">{{ sboms.length | number }} of {{ allSboms.length | number }} SBOMs</span>
+        <span class="result-count" *ngIf="total > 0">
+          {{ sboms.length | number }} of {{ total | number }} SBOMs
+          <span *ngIf="searchTerm" class="search-hint">matching "{{ searchTerm }}"</span>
+        </span>
       </div>
 
       <div class="search-bar">
         <input
           type="text"
           [(ngModel)]="searchTerm"
-          (ngModelChange)="onSearch()"
-          placeholder="Search by project name, file path, version…"
+          (ngModelChange)="onSearchChange($event)"
+          placeholder="Search projects by name…"
           class="search-input"
         />
-        <button *ngIf="searchTerm" class="clear-btn" (click)="clearSearch()">✕</button>
+        <span class="search-loading" *ngIf="loading">⏳</span>
+        <button *ngIf="searchTerm && !loading" class="clear-btn" (click)="clearSearch()">✕</button>
       </div>
 
-      <cdk-virtual-scroll-viewport itemSize="56" class="viewport">
+      <cdk-virtual-scroll-viewport itemSize="56" class="viewport" (scrolledIndexChange)="onScroll()">
         <div *cdkVirtualFor="let sbom of sboms; trackBy: trackBySbom" class="sbom-row">
           <a [routerLink]="['/sboms', sbom.sbom_id]" class="sbom-link">
             <span class="name">{{ sbom.document_name || sbom.source_file }}</span>
@@ -43,7 +49,13 @@ import { SBOMListItem } from '../../core/api.models';
         </div>
       </cdk-virtual-scroll-viewport>
 
-      <div *ngIf="allSboms.length && sboms.length === 0" class="empty-search">
+      <div *ngIf="!loading && total > 0 && sboms.length < total" class="load-more">
+        <button (click)="loadMore()" class="load-more-btn">
+          Load more ({{ sboms.length | number }} / {{ total | number }})
+        </button>
+      </div>
+
+      <div *ngIf="!loading && total === 0 && searchTerm" class="empty-search">
         No SBOMs matching "{{ searchTerm }}"
       </div>
     </div>
@@ -53,6 +65,7 @@ import { SBOMListItem } from '../../core/api.models';
     .list-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
     h1 { margin: 0; font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; }
     .result-count { font-size: 0.75rem; color: var(--text-muted); }
+    .search-hint { font-style: italic; }
 
     .search-bar { position: relative; margin-bottom: 12px; }
     .search-input {
@@ -64,6 +77,10 @@ import { SBOMListItem } from '../../core/api.models';
     }
     .search-input::placeholder { color: var(--text-muted); }
     .search-input:focus { border-color: var(--accent); }
+    .search-loading {
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      font-size: 0.8rem; line-height: 1;
+    }
     .clear-btn {
       position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
       background: none; border: none; color: var(--text-muted); cursor: pointer;
@@ -85,15 +102,31 @@ import { SBOMListItem } from '../../core/api.models';
     .has-vulns { color: var(--severity-critical); font-weight: 600; }
     .date { color: var(--text-muted); font-size: 0.75rem; width: 110px; }
 
+    .load-more {
+      padding: 12px; text-align: center;
+    }
+    .load-more-btn {
+      padding: 8px 24px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-family: inherit;
+      color: var(--text-secondary); transition: all 0.15s;
+    }
+    .load-more-btn:hover { border-color: var(--accent); color: var(--accent); }
+
     .empty-search {
       padding: 32px; text-align: center; color: var(--text-muted); font-size: 0.85rem;
     }
   `],
 })
-export class SbomListComponent implements OnInit {
+export class SbomListComponent implements OnInit, OnDestroy {
   sboms: SBOMListItem[] = [];
-  allSboms: SBOMListItem[] = [];
+  total = 0;
   searchTerm = '';
+  loading = false;
+
+  private page = 1;
+  private readonly pageSize = 100;
+  private readonly searchSubject = new Subject<string>();
+  private readonly destroy$ = new Subject<void>();
 
   constructor(
     private readonly api: ApiService,
@@ -101,35 +134,55 @@ export class SbomListComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.api.getSboms(1, 10000).subscribe((response) => {
-      this.allSboms = response.data;
-      this.sboms = this.allSboms;
-      this.cdr.markForCheck();
+    this.searchSubject.pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      takeUntil(this.destroy$),
+    ).subscribe((term) => {
+      this.page = 1;
+      this.sboms = [];
+      this.loadSboms(term);
     });
+
+    this.loadSboms('');
   }
 
-  onSearch(): void {
-    this.applyFilter();
-    this.cdr.markForCheck();
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  onSearchChange(term: string): void {
+    this.searchSubject.next(term.trim());
   }
 
   clearSearch(): void {
     this.searchTerm = '';
-    this.applyFilter();
-    this.cdr.markForCheck();
+    this.searchSubject.next('');
   }
 
-  private applyFilter(): void {
-    const term = this.searchTerm.trim().toLowerCase();
-    if (!term) {
-      this.sboms = this.allSboms;
-      return;
-    }
-    this.sboms = this.allSboms.filter((s) => {
-      const name = (s.document_name || '').toLowerCase();
-      const file = (s.source_file || '').toLowerCase();
-      const version = (s.spdx_version || '').toLowerCase();
-      return name.includes(term) || file.includes(term) || version.includes(term);
+  loadMore(): void {
+    this.page++;
+    this.loadSboms(this.searchTerm, true);
+  }
+
+  onScroll(): void {
+    // Could implement infinite scroll here in the future
+  }
+
+  private loadSboms(search: string, append = false): void {
+    this.loading = true;
+    this.cdr.markForCheck();
+
+    this.api.getSboms(this.page, this.pageSize, search).subscribe((response) => {
+      if (append) {
+        this.sboms = [...this.sboms, ...response.data];
+      } else {
+        this.sboms = response.data;
+      }
+      this.total = response.total;
+      this.loading = false;
+      this.cdr.markForCheck();
     });
   }
 

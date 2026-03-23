@@ -128,18 +128,30 @@ func (c *Client) QueryDashboardStats(ctx context.Context) (*dto.DashboardStats, 
 }
 
 // QuerySBOMs fetches a paginated list of SBOMs with package and vulnerability counts.
-func (c *Client) QuerySBOMs(ctx context.Context, page, pageSize uint64) (*dto.PaginatedResponse[dto.SBOMListItem], error) {
+// If search is non-empty, it filters SBOMs whose document_name or source_file contains the term.
+func (c *Client) QuerySBOMs(ctx context.Context, page, pageSize uint64, search string) (*dto.PaginatedResponse[dto.SBOMListItem], error) {
 	if page == 0 {
 		page = 1
 	}
 	offset := (page - 1) * pageSize
 
+	// Build WHERE clause for search.
+	whereClause := ""
+	var searchArgs []interface{}
+	if search != "" {
+		whereClause = "WHERE s.document_name ILIKE ? OR s.source_file ILIKE ?"
+		pattern := "%" + search + "%"
+		searchArgs = append(searchArgs, pattern, pattern)
+	}
+
+	// Count total (with search filter).
 	var total uint64
-	if err := c.Conn.QueryRow(ctx, "SELECT count() FROM sboms FINAL").Scan(&total); err != nil {
+	countQuery := "SELECT count() FROM (SELECT * FROM sboms FINAL) AS s " + whereClause
+	if err := c.Conn.QueryRow(ctx, countQuery, searchArgs...).Scan(&total); err != nil {
 		return nil, fmt.Errorf("failed to count sboms: %w", err)
 	}
 
-	rows, err := c.Conn.Query(ctx, `
+	query := fmt.Sprintf(`
 		SELECT
 			s.sbom_id,
 			s.source_file,
@@ -158,9 +170,13 @@ func (c *Client) QuerySBOMs(ctx context.Context, page, pageSize uint64) (*dto.Pa
 			FROM vulnerabilities FINAL
 			GROUP BY sbom_id
 		) AS v ON s.sbom_id = v.sbom_id
-		ORDER BY s.ingested_at DESC
+		%s
+		ORDER BY s.document_name ASC, s.ingested_at DESC
 		LIMIT ? OFFSET ?
-	`, pageSize, offset)
+	`, whereClause)
+
+	args := append(searchArgs, pageSize, offset)
+	rows, err := c.Conn.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query sboms: %w", err)
 	}
