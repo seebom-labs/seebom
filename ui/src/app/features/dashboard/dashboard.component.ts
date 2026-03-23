@@ -27,32 +27,32 @@ import { HorizontalBarChartComponent, BarItem } from '../../shared/charts/horizo
       @if (stats) {
         <div class="kpi-row">
           <div class="kpi-card">
-            <span class="kpi-value">{{ stats.total_sboms }}</span>
+            <span class="kpi-value">{{ stats.total_sboms | number }}</span>
             <span class="kpi-label">SBOMs</span>
           </div>
           <div class="kpi-card">
-            <span class="kpi-value">{{ stats.total_packages }}</span>
+            <span class="kpi-value">{{ stats.total_packages | number }}</span>
             <span class="kpi-label">Packages</span>
           </div>
           <div class="kpi-card warn">
             @if (stats.total_vex_statements > 0) {
-              <span class="kpi-value">{{ stats.effective_vulnerabilities }}</span>
+              <span class="kpi-value">{{ stats.effective_vulnerabilities | number }}</span>
               <span class="kpi-label">Effective Vulns</span>
             } @else {
-              <span class="kpi-value">{{ stats.total_vulnerabilities }}</span>
+              <span class="kpi-value">{{ stats.total_vulnerabilities | number }}</span>
               <span class="kpi-label">Total Vulns</span>
             }
           </div>
           <div class="kpi-card ok">
-            <span class="kpi-value">{{ stats.suppressed_by_vex }}</span>
+            <span class="kpi-value">{{ stats.suppressed_by_vex | number }}</span>
             <span class="kpi-label">Suppressed by VEX</span>
           </div>
           <div class="kpi-card ok">
-            <span class="kpi-value">{{ stats.exempted_packages }}</span>
+            <span class="kpi-value">{{ stats.exempted_packages | number }}</span>
             <span class="kpi-label">Exempted Licenses</span>
           </div>
           <div class="kpi-card">
-            <span class="kpi-value">{{ stats.total_vex_statements }}</span>
+            <span class="kpi-value">{{ stats.total_vex_statements | number }}</span>
             <span class="kpi-label">VEX Statements</span>
           </div>
         </div>
@@ -95,7 +95,7 @@ import { HorizontalBarChartComponent, BarItem } from '../../shared/charts/horizo
           <span class="refresh-label">Last CVE Refresh:</span>
           <span class="refresh-time">{{ stats.last_cve_refresh | date:'medium' }}</span>
           <span class="refresh-vulns" *ngIf="stats.new_vulns_since_refresh">
-            {{ stats.new_vulns_since_refresh }} new vulns found
+            {{ stats.new_vulns_since_refresh | number }} new vulns found
           </span>
           <span class="refresh-ok" *ngIf="!stats.new_vulns_since_refresh">
             ✓ No new vulnerabilities
@@ -105,7 +105,7 @@ import { HorizontalBarChartComponent, BarItem } from '../../shared/charts/horizo
         <div class="warning-banner" *ngIf="stats.archived_repos_count && stats.archived_repos_count > 0">
           <span class="warning-icon">⚠️</span>
           <span class="warning-text">
-            <strong>{{ stats.archived_repos_count }}</strong> archived GitHub repositories detected in your dependencies.
+            <strong>{{ stats.archived_repos_count | number }}</strong> archived GitHub repositories detected in your dependencies.
             <a routerLink="/archived-packages">View Details →</a>
           </span>
         </div>

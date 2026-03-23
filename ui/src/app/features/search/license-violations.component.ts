@@ -20,10 +20,10 @@ type Tab = 'non-compliant' | 'exceptions';
 
       <div class="tabs">
         <button [class.active]="activeTab === 'non-compliant'" (click)="activeTab = 'non-compliant'">
-          Non-Compliant ({{ violations.length }})
+          Non-Compliant ({{ violations.length | number }})
         </button>
         <button [class.active]="activeTab === 'exceptions'" (click)="activeTab = 'exceptions'">
-          Active Exceptions ({{ totalExceptions }})
+          Active Exceptions ({{ totalExceptions | number }})
         </button>
       </div>
 
@@ -34,14 +34,14 @@ type Tab = 'non-compliant' | 'exceptions';
             <div class="project-header">
               <a [routerLink]="['/sboms', v.sbom_id]" class="project-name">{{ v.document_name || v.source_file }}</a>
               <div class="counts">
-                <span class="copyleft-badge" *ngIf="v.copyleft_count">{{ v.copyleft_count }} copyleft</span>
-                <span class="unknown-badge" *ngIf="v.unknown_count">{{ v.unknown_count }} unknown</span>
+                <span class="copyleft-badge" *ngIf="v.copyleft_count">{{ v.copyleft_count | number }} copyleft</span>
+                <span class="unknown-badge" *ngIf="v.unknown_count">{{ v.unknown_count | number }} unknown</span>
               </div>
             </div>
             <div class="details">
               <span class="licenses">{{ v.violating_licenses.join(', ') }}</span>
               <span class="pkgs" *ngIf="v.non_compliant_packages.length">
-                ({{ v.non_compliant_packages.length }} packages)
+                ({{ v.non_compliant_packages.length | number }} packages)
               </span>
             </div>
           </div>

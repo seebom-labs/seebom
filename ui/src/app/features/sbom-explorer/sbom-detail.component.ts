@@ -29,20 +29,20 @@ type Tab = 'vulns' | 'licenses' | 'deps';
       </div>
 
       <div class="stats-row">
-        <div class="stat"><strong>{{ detail.package_count }}</strong> packages</div>
-        <div class="stat"><strong>{{ detail.vuln_count }}</strong> vulnerabilities</div>
-        <div class="stat critical" *ngIf="detail.critical_vulns">{{ detail.critical_vulns }} critical</div>
-        <div class="stat high" *ngIf="detail.high_vulns">{{ detail.high_vulns }} high</div>
-        <div class="stat medium" *ngIf="detail.medium_vulns">{{ detail.medium_vulns }} medium</div>
-        <div class="stat low" *ngIf="detail.low_vulns">{{ detail.low_vulns }} low</div>
+        <div class="stat"><strong>{{ detail.package_count | number }}</strong> packages</div>
+        <div class="stat"><strong>{{ detail.vuln_count | number }}</strong> vulnerabilities</div>
+        <div class="stat critical" *ngIf="detail.critical_vulns">{{ detail.critical_vulns | number }} critical</div>
+        <div class="stat high" *ngIf="detail.high_vulns">{{ detail.high_vulns | number }} high</div>
+        <div class="stat medium" *ngIf="detail.medium_vulns">{{ detail.medium_vulns | number }} medium</div>
+        <div class="stat low" *ngIf="detail.low_vulns">{{ detail.low_vulns | number }} low</div>
       </div>
 
       <div class="tabs">
         <button [class.active]="activeTab === 'vulns'" (click)="activeTab = 'vulns'">
-          Vulnerabilities ({{ vulns.length }})
+          Vulnerabilities ({{ vulns.length | number }})
         </button>
         <button [class.active]="activeTab === 'licenses'" (click)="activeTab = 'licenses'">
-          Licenses ({{ licenses.length }})
+          Licenses ({{ licenses.length | number }})
         </button>
         <button [class.active]="activeTab === 'deps'" (click)="activeTab = 'deps'">
           Dependencies
@@ -83,7 +83,7 @@ type Tab = 'vulns' | 'licenses' | 'deps';
                     [title]="lic.exemption_reason || 'Approved exception'">
                 ✓ Exempted
               </span>
-              <span class="lic-count">{{ lic.package_count }} pkgs</span>
+              <span class="lic-count">{{ lic.package_count | number }} pkgs</span>
               <span class="lic-toggle">{{ expandedLicense === lic.license_id ? '▾' : '▸' }}</span>
             </div>
             <div class="lic-exemption-note" *ngIf="lic.exemption_reason && expandedLicense === lic.license_id">

@@ -30,7 +30,7 @@ export interface DonutSegment {
           />
         }
         <text [attr.x]="center" [attr.y]="center - 8" text-anchor="middle" class="center-value">
-          {{ total }}
+          {{ total | number }}
         </text>
         <text [attr.x]="center" [attr.y]="center + 12" text-anchor="middle" class="center-label">
           {{ centerLabel }}
@@ -41,7 +41,7 @@ export interface DonutSegment {
           <div class="legend-item">
             <span class="legend-dot" [style.background]="seg.color"></span>
             <span class="legend-label">{{ seg.label }}</span>
-            <span class="legend-value">{{ seg.value }}</span>
+            <span class="legend-value">{{ seg.value | number }}</span>
           </div>
         }
       </div>

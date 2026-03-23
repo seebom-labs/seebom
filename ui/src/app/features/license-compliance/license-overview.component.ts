@@ -24,19 +24,19 @@ interface GroupedProject {
       <div class="categories">
         <div class="category-card permissive">
           <h3>Permissive</h3>
-          <span class="count">{{ getCategoryCount('permissive') }}</span>
+          <span class="count">{{ getCategoryCount('permissive') | number }}</span>
         </div>
         <div class="category-card copyleft">
           <h3>Copyleft</h3>
-          <span class="count">{{ getCategoryCount('copyleft') }}</span>
+          <span class="count">{{ getCategoryCount('copyleft') | number }}</span>
         </div>
         <div class="category-card unknown">
           <h3>Unknown</h3>
-          <span class="count">{{ getCategoryCount('unknown') }}</span>
+          <span class="count">{{ getCategoryCount('unknown') | number }}</span>
         </div>
         <div class="category-card exempted">
           <h3>Exempted</h3>
-          <span class="count">{{ getExemptedCount() }}</span>
+          <span class="count">{{ getExemptedCount() | number }}</span>
         </div>
       </div>
 
@@ -70,13 +70,13 @@ interface GroupedProject {
               </span>
             </div>
             <div class="header-stats">
-              <span class="stat">{{ item.package_count }} <small>usages</small></span>
-              <span class="stat">{{ item.sbom_count }} <small>{{ item.sbom_count === 1 ? 'project' : 'projects' }}</small></span>
+              <span class="stat">{{ item.package_count | number }} <small>usages</small></span>
+              <span class="stat">{{ item.sbom_count | number }} <small>{{ item.sbom_count === 1 ? 'project' : 'projects' }}</small></span>
               <span class="stat warn" *ngIf="item.non_compliant_packages?.length && item.category !== 'permissive' && !item.exempted_packages?.length">
-                {{ item.non_compliant_packages!.length }} <small>non-compliant</small>
+                {{ item.non_compliant_packages!.length | number }} <small>non-compliant</small>
               </span>
               <span class="stat ok" *ngIf="item.exempted_packages?.length">
-                {{ item.exempted_packages!.length }} <small>exempted</small>
+                {{ item.exempted_packages!.length | number }} <small>exempted</small>
               </span>
             </div>
             <span class="toggle-icon">{{ expandedLicense === item.license_id ? '▾' : '▸' }}</span>
@@ -108,7 +108,7 @@ interface GroupedProject {
 
             <!-- Non-Compliant Packages -->
             <div class="detail-section" *ngIf="item.non_compliant_packages?.length && item.category !== 'permissive' && !item.exempted_packages?.length">
-              <h4>Non-Compliant Packages ({{ item.non_compliant_packages!.length }})</h4>
+              <h4>Non-Compliant Packages ({{ item.non_compliant_packages!.length | number }})</h4>
               <div class="pkg-list">
                 <span *ngFor="let pkg of item.non_compliant_packages" class="pkg-tag violation">{{ pkg }}</span>
               </div>
@@ -116,7 +116,7 @@ interface GroupedProject {
 
             <!-- Exempted Packages -->
             <div class="detail-section" *ngIf="item.exempted_packages?.length">
-              <h4>Exempted Packages ({{ item.exempted_packages!.length }})</h4>
+              <h4>Exempted Packages ({{ item.exempted_packages!.length | number }})</h4>
               <div class="pkg-list">
                 <span *ngFor="let pkg of item.exempted_packages" class="pkg-tag exempted">{{ pkg }}</span>
               </div>

@@ -14,25 +14,25 @@ import { DashboardStats } from '../../core/api.models';
         <div class="bar-row">
           <span class="label critical">Critical</span>
           <div class="bar" [style.width.%]="getPercent(stats.critical_vulns)">
-            {{ stats.critical_vulns }}
+            {{ stats.critical_vulns | number }}
           </div>
         </div>
         <div class="bar-row">
           <span class="label high">High</span>
           <div class="bar bar-high" [style.width.%]="getPercent(stats.high_vulns)">
-            {{ stats.high_vulns }}
+            {{ stats.high_vulns | number }}
           </div>
         </div>
         <div class="bar-row">
           <span class="label medium">Medium</span>
           <div class="bar bar-medium" [style.width.%]="getPercent(stats.medium_vulns)">
-            {{ stats.medium_vulns }}
+            {{ stats.medium_vulns | number }}
           </div>
         </div>
         <div class="bar-row">
           <span class="label low">Low</span>
           <div class="bar bar-low" [style.width.%]="getPercent(stats.low_vulns)">
-            {{ stats.low_vulns }}
+            {{ stats.low_vulns | number }}
           </div>
         </div>
       </div>

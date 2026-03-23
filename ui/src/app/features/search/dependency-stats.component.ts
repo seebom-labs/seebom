@@ -47,14 +47,14 @@ type SortField = 'projects' | 'name' | 'versions' | 'vulns';
             <span class="pkg-purl" *ngIf="dep.purl">{{ dep.purl }}</span>
           </div>
           <span class="col-projects">
-            <strong>{{ dep.project_count }}</strong>
+            <strong>{{ dep.project_count | number }}</strong>
           </span>
           <span class="col-versions">
             <span class="version-pill" *ngFor="let v of dep.versions.slice(0, 5)">{{ v }}</span>
             <span class="more" *ngIf="dep.versions.length > 5">+{{ dep.versions.length - 5 }}</span>
           </span>
           <span class="col-vulns" [class.has-vulns]="dep.vuln_count > 0">
-            {{ dep.vuln_count }}
+            {{ dep.vuln_count | number }}
           </span>
         </div>
       </cdk-virtual-scroll-viewport>

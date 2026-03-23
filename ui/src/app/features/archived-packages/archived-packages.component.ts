@@ -45,8 +45,8 @@ interface GroupedArchived {
         </div>
       } @else {
         <div class="summary-bar">
-          <span class="summary-count">{{ grouped.length }} archived repo(s)</span>
-          <span class="summary-projects">affecting {{ totalProjects }} project(s)</span>
+          <span class="summary-count">{{ grouped.length | number }} archived repo(s)</span>
+          <span class="summary-projects">affecting {{ totalProjects | number }} project(s)</span>
         </div>
 
         <div class="repo-list">
@@ -57,7 +57,7 @@ interface GroupedArchived {
                   📦 {{ item.repo }}
                 </a>
                 <span class="archived-badge">ARCHIVED</span>
-                <span class="stars">⭐ {{ item.stars }}</span>
+                <span class="stars">⭐ {{ item.stars | number }}</span>
               </div>
               <div class="repo-meta">
                 Last pushed: {{ item.lastPushed | date:'mediumDate' }}

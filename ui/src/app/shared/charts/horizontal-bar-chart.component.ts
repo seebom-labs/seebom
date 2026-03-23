@@ -23,7 +23,7 @@ export interface BarItem {
                  [style.background]="bar.color">
             </div>
           </div>
-          <span class="bar-value">{{ bar.value }}</span>
+          <span class="bar-value">{{ bar.value | number }}</span>
         </div>
       }
     </div>

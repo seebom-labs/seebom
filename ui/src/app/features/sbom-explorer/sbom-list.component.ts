@@ -15,7 +15,7 @@ import { SBOMListItem } from '../../core/api.models';
     <div class="sbom-list">
       <div class="list-header">
         <h1>SBOM Explorer</h1>
-        <span class="result-count" *ngIf="allSboms.length">{{ sboms.length }} of {{ allSboms.length }} SBOMs</span>
+        <span class="result-count" *ngIf="allSboms.length">{{ sboms.length | number }} of {{ allSboms.length | number }} SBOMs</span>
       </div>
 
       <div class="search-bar">
@@ -34,9 +34,9 @@ import { SBOMListItem } from '../../core/api.models';
           <a [routerLink]="['/sboms', sbom.sbom_id]" class="sbom-link">
             <span class="name">{{ sbom.document_name || sbom.source_file }}</span>
             <span class="version badge">{{ sbom.spdx_version }}</span>
-            <span class="packages">{{ sbom.package_count }} packages</span>
+            <span class="packages">{{ sbom.package_count | number }} packages</span>
             <span class="vulns" [class.has-vulns]="sbom.vuln_count > 0">
-              {{ sbom.vuln_count }} vulns
+              {{ sbom.vuln_count | number }} vulns
             </span>
             <span class="date">{{ sbom.ingested_at | date:'short' }}</span>
           </a>
