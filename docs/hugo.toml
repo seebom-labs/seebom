@@ -71,6 +71,11 @@ enableGitInfo = false
     url = "/docs/release/"
     identifier = "release"
   [[menu.main]]
+    name = "FAQ"
+    weight = 70
+    url = "/docs/faq/"
+    identifier = "faq"
+  [[menu.main]]
     name = "GitHub"
     weight = 90
     url = "https://github.com/seebom-labs/seebom"

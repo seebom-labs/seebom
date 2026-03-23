@@ -24,6 +24,14 @@ s3:
   # For public buckets, leave empty.
   accessKey: ""
   secretKey: ""
+  # Reference an existing Kubernetes Secret for S3 credentials instead of
+  # specifying them as plain values above. Works the same way as
+  # clickhouse.userPasswordSecret.
+  credentialsSecret:
+    enabled: false
+    secretName: ""
+    accessKeyKey: "S3_ACCESS_KEY"   # key inside the Secret that holds the access key
+    secretKeyKey: "S3_SECRET_KEY"   # key inside the Secret that holds the secret key
 
 # ClickHouse (provisioned via ClickHouse Operator)
 clickhouse:

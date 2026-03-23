@@ -56,6 +56,12 @@ s3:
   buckets: ""
   accessKey: ""   # injected via --set or K8s Secret
   secretKey: ""   # injected via --set or K8s Secret
+  # Or reference an existing Kubernetes Secret:
+  # credentialsSecret:
+  #   enabled: true
+  #   secretName: "my-s3-credentials"
+  #   accessKeyKey: "S3_ACCESS_KEY"
+  #   secretKeyKey: "S3_SECRET_KEY"
 
 # ─── SBOM Source via PVC (alternative to S3) ─────────────────────────────────
 # Disable git-sync and use a one-shot seed job instead.

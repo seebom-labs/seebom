@@ -49,6 +49,12 @@ s3:
   buckets: ""
   accessKey: ""
   secretKey: ""
+  # Or reference an existing Kubernetes Secret:
+  # credentialsSecret:
+  #   enabled: true
+  #   secretName: "my-s3-credentials"
+  #   accessKeyKey: "S3_ACCESS_KEY"
+  #   secretKeyKey: "S3_SECRET_KEY"
 
 # ─── SBOM Source (git-sync, alternative to S3 for small repos) ───────────────
 # git-sync runs as a sidecar and continuously pulls from your Git repo.

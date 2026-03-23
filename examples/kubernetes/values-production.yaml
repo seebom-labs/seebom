@@ -54,6 +54,12 @@ s3:
   buckets: ""
   accessKey: ""   # pass via --set for private buckets
   secretKey: ""   # pass via --set for private buckets
+  # Or reference an existing Kubernetes Secret (recommended for production):
+  # credentialsSecret:
+  #   enabled: true
+  #   secretName: "my-s3-credentials"
+  #   accessKeyKey: "S3_ACCESS_KEY"
+  #   secretKeyKey: "S3_SECRET_KEY"
 
 # ─── SBOM Source via PVC (alternative to S3) ─────────────────────────────────
 # The seed job does a shallow git clone into a PVC on first install.
