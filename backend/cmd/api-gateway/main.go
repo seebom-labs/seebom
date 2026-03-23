@@ -64,12 +64,13 @@ func main() {
 		writeJSON(w, http.StatusOK, stats)
 	})
 
-	// List SBOMs with pagination.
+	// List SBOMs with pagination and optional search.
 	mux.HandleFunc("GET /api/v1/sboms", func(w http.ResponseWriter, r *http.Request) {
 		page := parseUint64(r.URL.Query().Get("page"), 1)
 		pageSize := clampPageSize(parseUint64(r.URL.Query().Get("page_size"), 50))
+		search := sanitizeSearchTerm(r.URL.Query().Get("search"))
 
-		resp, err := chClient.QuerySBOMs(r.Context(), page, pageSize)
+		resp, err := chClient.QuerySBOMs(r.Context(), page, pageSize, search)
 		if err != nil {
 			log.Printf("ERROR: list sboms: %v", err)
 			writeError(w, http.StatusInternalServerError, "Failed to fetch SBOMs")
@@ -307,6 +308,25 @@ func clampPageSize(v uint64) uint64 {
 		return maxPageSize
 	}
 	return v
+}
+
+// sanitizeSearchTerm cleans a user-provided search string.
+// It trims whitespace, enforces a maximum length, and removes characters
+// that could be used for XSS or injection attacks.
+func sanitizeSearchTerm(s string) string {
+	s = strings.TrimSpace(s)
+	// Limit length to prevent abuse.
+	const maxLen = 200
+	if len(s) > maxLen {
+		s = s[:maxLen]
+	}
+	// Remove characters that have no business in a project name search:
+	// HTML tags, script injections, null bytes, etc.
+	s = strings.NewReplacer(
+		"<", "", ">", "", "&", "", "\"", "", "'", "",
+		";", "", "\x00", "", "\\", "",
+	).Replace(s)
+	return s
 }
 
 // isValidUUID checks whether the given string matches UUID format.

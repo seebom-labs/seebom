@@ -30,10 +30,13 @@ export class ApiService {
     return this.http.get<DashboardStats>(`${this.baseUrl}/stats/dashboard`);
   }
 
-  getSboms(page = 1, pageSize = 50): Observable<PaginatedResponse<SBOMListItem>> {
-    const params = new HttpParams()
+  getSboms(page = 1, pageSize = 50, search = ''): Observable<PaginatedResponse<SBOMListItem>> {
+    let params = new HttpParams()
       .set('page', page.toString())
       .set('page_size', pageSize.toString());
+    if (search) {
+      params = params.set('search', search);
+    }
     return this.http.get<PaginatedResponse<SBOMListItem>>(`${this.baseUrl}/sboms`, { params });
   }
 
