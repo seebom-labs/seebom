@@ -389,17 +389,45 @@ func (c *Client) QueryDependencyStats(ctx context.Context, limit uint64) (*dto.D
 	`).Scan(&totalUnique)
 
 	// Top N most-used dependencies across all projects.
+	// project_count = distinct projects, not SBOMs. We derive the project key from
+	// source_file by extracting the first two path segments (org/repo) which are
+	// stable across versions. For local files, we fall back to document_name.
+	// This avoids counting multiple releases of the same project separately.
 	rows, err := c.Conn.Query(ctx, `
 		SELECT
 			dep_name,
 			dep_purl,
-			count(DISTINCT sbom_id) AS project_count,
+			count(DISTINCT
+				multiIf(
+					position(source_file, 's3://') = 1,
+					arrayStringConcat(
+						arraySlice(
+							splitByChar('/', replaceOne(source_file, 's3://', '')),
+							2, 2
+						), '/'
+					),
+					doc_name != '',
+					doc_name,
+					source_file
+				)
+			) AS project_count,
 			groupArray(DISTINCT dep_version) AS versions
-		FROM sbom_packages FINAL
-		ARRAY JOIN
-			package_names AS dep_name,
-			package_purls AS dep_purl,
-			package_versions AS dep_version
+		FROM (
+			SELECT
+				p.sbom_id,
+				p.source_file,
+				ifNull(s.document_name, p.source_file) AS doc_name,
+				dep_name,
+				dep_purl,
+				dep_version
+			FROM (SELECT * FROM sbom_packages FINAL) AS p
+			INNER JOIN (SELECT sbom_id, document_name FROM sboms FINAL) AS s
+				ON p.sbom_id = s.sbom_id
+			ARRAY JOIN
+				p.package_names AS dep_name,
+				p.package_purls AS dep_purl,
+				p.package_versions AS dep_version
+		)
 		WHERE dep_name != ''
 		GROUP BY dep_name, dep_purl
 		ORDER BY project_count DESC

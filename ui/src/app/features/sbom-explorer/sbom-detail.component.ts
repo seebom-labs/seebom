@@ -70,27 +70,85 @@ type Tab = 'vulns' | 'licenses' | 'deps';
 
       <!-- Licenses Tab -->
       <div *ngIf="activeTab === 'licenses'" class="tab-content">
-        <div class="license-grid">
-          <div *ngFor="let lic of licenses"
-               class="license-card"
+        <div class="license-summary">
+          <div class="license-summary-item permissive-bg">
+            <span class="license-summary-count">{{ getLicenseCategoryCount('permissive') }}</span>
+            <span class="license-summary-label">Permissive</span>
+          </div>
+          <div class="license-summary-item copyleft-bg">
+            <span class="license-summary-count">{{ getLicenseCategoryCount('copyleft') }}</span>
+            <span class="license-summary-label">Copyleft</span>
+          </div>
+          <div class="license-summary-item unknown-bg">
+            <span class="license-summary-count">{{ getLicenseCategoryCount('unknown') }}</span>
+            <span class="license-summary-label">Unknown</span>
+          </div>
+        </div>
+
+        <div class="license-list">
+          <div *ngFor="let lic of licenses; trackBy: trackByLicense"
+               class="license-row"
                [class]="getLicenseCardClass(lic)"
-               [class.expanded]="expandedLicense === lic.license_id"
-               (click)="toggleLicense(lic.license_id)">
-            <div class="lic-header">
-              <span class="lic-id">{{ lic.license_id || 'Unknown' }}</span>
-              <span class="lic-cat">{{ lic.category }}</span>
+               [class.expanded]="expandedLicense === lic.license_id">
+
+            <div class="lic-header" (click)="toggleLicense(lic.license_id)">
+              <span class="lic-toggle">{{ expandedLicense === lic.license_id ? '▾' : '▸' }}</span>
+              <span class="lic-id" *ngIf="!isUrl(lic.license_id)">{{ lic.license_id || 'Unknown' }}</span>
+              <a *ngIf="isUrl(lic.license_id)"
+                 [href]="lic.license_id" target="_blank" rel="noopener"
+                 class="lic-id lic-id-link"
+                 (click)="$event.stopPropagation()">
+                {{ extractLicenseLabel(lic.license_id) }}
+                <span class="link-icon">↗</span>
+              </a>
+              <span class="lic-cat-badge" [class]="'cat-badge-' + lic.category">{{ lic.category }}</span>
               <span class="lic-exempted-badge" *ngIf="lic.exempted_packages?.length"
                     [title]="lic.exemption_reason || 'Approved exception'">
                 ✓ Exempted
               </span>
-              <span class="lic-count">{{ lic.package_count | number }} pkgs</span>
-              <span class="lic-toggle">{{ expandedLicense === lic.license_id ? '▾' : '▸' }}</span>
+              <span class="lic-count">{{ lic.package_count | number }} {{ lic.package_count === 1 ? 'package' : 'packages' }}</span>
             </div>
-            <div class="lic-exemption-note" *ngIf="lic.exemption_reason && expandedLicense === lic.license_id">
-              {{ lic.exemption_reason }}
-            </div>
-            <div class="lic-packages" *ngIf="expandedLicense === lic.license_id && lic.packages?.length">
-              <div *ngFor="let pkg of lic.packages" class="lic-pkg">{{ pkg }}</div>
+
+            <div class="lic-body" *ngIf="expandedLicense === lic.license_id">
+              <div class="lic-exemption-note" *ngIf="lic.exemption_reason">
+                <span class="exemption-icon">✓</span>
+                {{ lic.exemption_reason }}
+              </div>
+
+              <div class="lic-url-row" *ngIf="isUrl(lic.license_id)">
+                <span class="lic-url-label">License URL:</span>
+                <a [href]="lic.license_id" target="_blank" rel="noopener" class="lic-url-link">
+                  {{ lic.license_id }}
+                </a>
+              </div>
+
+              <div class="lic-pkg-section" *ngIf="lic.packages?.length">
+                <h4 class="lic-pkg-title">Packages ({{ lic.packages.length | number }})</h4>
+                <div class="lic-pkg-list">
+                  <div *ngFor="let pkg of lic.packages" class="lic-pkg-item">
+                    <a *ngIf="isUrl(pkg)" [href]="pkg" target="_blank" rel="noopener" class="lic-pkg-link">
+                      {{ extractPackageLabel(pkg) }} <span class="link-icon">↗</span>
+                    </a>
+                    <span *ngIf="!isUrl(pkg)" class="lic-pkg-name">{{ pkg }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="lic-pkg-section" *ngIf="lic.exempted_packages?.length">
+                <h4 class="lic-pkg-title exempted-title">Exempted Packages ({{ lic.exempted_packages!.length | number }})</h4>
+                <div class="lic-pkg-list">
+                  <div *ngFor="let pkg of lic.exempted_packages" class="lic-pkg-item exempted">
+                    <a *ngIf="isUrl(pkg)" [href]="pkg" target="_blank" rel="noopener" class="lic-pkg-link exempted-link">
+                      {{ extractPackageLabel(pkg) }} <span class="link-icon">↗</span>
+                    </a>
+                    <span *ngIf="!isUrl(pkg)" class="lic-pkg-name">{{ pkg }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <p class="lic-no-packages" *ngIf="!lic.packages?.length && !lic.exempted_packages?.length">
+                No individual package details available.
+              </p>
             </div>
           </div>
         </div>
@@ -165,42 +223,97 @@ type Tab = 'vulns' | 'licenses' | 'deps';
     .vex-not_affected { background: var(--status-success-bg); color: var(--status-success); }
     .vex-fixed { background: var(--status-info-bg); color: var(--accent-hover); }
     .purl { color: var(--text-secondary); font-size: 0.7rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
-    .license-grid { display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; }
-    .license-card {
-      border-radius: 3px; min-width: 200px; cursor: pointer;
-      transition: box-shadow 0.15s; overflow: hidden;
+    .license-summary { display: flex; gap: 8px; margin-bottom: 16px; }
+    .license-summary-item {
+      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+      padding: 12px; border-radius: 4px; border: 1px solid var(--border);
     }
-    .license-card:hover { box-shadow: 0 0 0 1px #9ca3af; }
-    .license-card.expanded { min-width: 100%; }
-    .lic-header {
-      display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+    .license-summary-count { font-size: 1.25rem; font-weight: 700; color: var(--text); }
+    .license-summary-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); font-weight: 500; }
+    .permissive-bg { background: var(--surface-alt); }
+    .copyleft-bg { background: var(--severity-critical-bg); }
+    .unknown-bg { background: var(--surface-alt); }
+
+    .license-list { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+    .license-row {
+      border-radius: 4px; overflow: hidden; transition: box-shadow 0.15s;
     }
-    .cat-permissive { background: var(--surface-alt); border: 1px solid var(--border); }
+    .license-row:hover { box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .license-row.expanded { border-color: var(--accent); }
+    .cat-permissive { background: var(--surface); border: 1px solid var(--border); }
     .cat-copyleft { background: var(--severity-critical-bg); border: 1px solid #fecaca; }
     .cat-copyleft-exempted { background: var(--status-success-bg); border: 1px solid var(--status-success); }
-    .cat-unknown { background: var(--surface-alt); border: 1px solid var(--border); }
-    .lic-id { font-weight: 600; font-size: 0.85rem; }
-    .lic-cat { font-size: 0.7rem; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.03em; }
+    .cat-unknown { background: var(--surface); border: 1px solid var(--border); }
+    .lic-header {
+      display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer;
+      transition: background 0.1s;
+    }
+    .lic-header:hover { background: rgba(0,0,0,0.02); }
+    .lic-toggle { font-size: 0.7rem; color: var(--text-muted); width: 14px; flex-shrink: 0; }
+    .lic-id { font-weight: 600; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lic-id-link { color: var(--accent); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+    .lic-id-link:hover { text-decoration: underline; }
+    .link-icon { font-size: 0.65rem; opacity: 0.6; }
+    .lic-cat-badge {
+      padding: 2px 7px; border-radius: 2px; font-size: 0.6rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.03em; flex-shrink: 0;
+    }
+    .cat-badge-permissive { background: var(--status-success-bg); color: var(--status-success); }
+    .cat-badge-copyleft { background: var(--severity-critical-bg); color: var(--severity-critical); }
+    .cat-badge-unknown { background: var(--bg); color: var(--text-secondary); }
     .lic-exempted-badge {
-      padding: 1px 6px; border-radius: 2px; font-size: 0.6rem; font-weight: 600;
+      padding: 2px 6px; border-radius: 2px; font-size: 0.6rem; font-weight: 600;
       background: var(--status-success-bg); color: var(--status-success);
-      text-transform: uppercase; letter-spacing: 0.03em; cursor: help;
+      text-transform: uppercase; letter-spacing: 0.03em; cursor: help; flex-shrink: 0;
     }
-    .lic-count { font-size: 0.8rem; color: var(--text-secondary); margin-left: auto; }
-    .lic-toggle { font-size: 0.7rem; color: var(--text-muted); }
+    .lic-count { font-size: 0.78rem; color: var(--text-secondary); margin-left: auto; white-space: nowrap; }
+
+    .lic-body { border-top: 1px solid var(--border); padding: 12px 14px 14px; }
     .lic-exemption-note {
-      font-size: 0.7rem; color: var(--text-secondary); font-style: italic;
-      padding: 2px 14px 6px; border-top: 1px solid var(--border);
+      display: flex; align-items: flex-start; gap: 6px;
+      font-size: 0.75rem; color: var(--text); line-height: 1.4;
+      background: var(--status-success-bg); padding: 8px 12px; border-radius: 3px;
+      margin-bottom: 12px;
     }
-    .lic-packages {
-      border-top: 1px solid #e5e7eb; padding: 8px 14px;
-      display: flex; flex-wrap: wrap; gap: 4px;
-      max-height: 200px; overflow-y: auto;
+    .exemption-icon { color: var(--status-success); font-weight: 700; flex-shrink: 0; }
+    .lic-url-row {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+      font-size: 0.75rem;
     }
-    .lic-pkg {
-      font-size: 0.72rem; color: var(--dark); background: var(--surface); border: 1px solid var(--border);
-      padding: 2px 8px; border-radius: 2px; white-space: nowrap;
+    .lic-url-label { color: var(--text-secondary); font-weight: 500; flex-shrink: 0; }
+    .lic-url-link {
+      color: var(--accent); text-decoration: none; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap; font-family: monospace; font-size: 0.72rem;
     }
+    .lic-url-link:hover { text-decoration: underline; }
+
+    .lic-pkg-section { margin-bottom: 10px; }
+    .lic-pkg-section:last-child { margin-bottom: 0; }
+    .lic-pkg-title {
+      font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.03em; color: var(--text-secondary); margin: 0 0 8px;
+    }
+    .lic-pkg-title.exempted-title { color: var(--status-success); }
+    .lic-pkg-list {
+      display: flex; flex-direction: column; gap: 2px;
+      max-height: 300px; overflow-y: auto;
+    }
+    .lic-pkg-item {
+      padding: 5px 10px; border-radius: 3px; font-size: 0.75rem;
+      background: var(--bg); border: 1px solid var(--border);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .lic-pkg-item.exempted {
+      background: var(--status-success-bg); border-color: var(--status-success);
+    }
+    .lic-pkg-name { color: var(--text); font-family: monospace; font-size: 0.72rem; }
+    .lic-pkg-link {
+      color: var(--accent); text-decoration: none; font-family: monospace; font-size: 0.72rem;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .lic-pkg-link:hover { text-decoration: underline; }
+    .lic-pkg-link.exempted-link { color: var(--status-success); }
+    .lic-no-packages { font-size: 0.75rem; color: var(--text-muted); margin: 0; font-style: italic; }
     .dep-table-header {
       display: flex; align-items: center; gap: 16px; padding: 8px 12px;
       background: var(--bg); border-radius: 2px; font-weight: 600; font-size: 0.7rem;
@@ -281,10 +394,44 @@ export class SbomDetailComponent implements OnInit {
 
   trackByVuln(_i: number, v: VulnerabilityListItem): string { return v.vuln_id + v.purl; }
   trackByDep(_i: number, d: FlatDep): number { return d.index; }
+  trackByLicense(_i: number, lic: SBOMLicenseBreakdownItem): string { return lic.license_id; }
 
   toggleLicense(licenseId: string): void {
     this.expandedLicense = this.expandedLicense === licenseId ? null : licenseId;
     this.cdr.markForCheck();
+  }
+
+  isUrl(value: string): boolean {
+    if (!value) return false;
+    return value.startsWith('http://') || value.startsWith('https://');
+  }
+
+  extractLicenseLabel(url: string): string {
+    try {
+      const u = new URL(url);
+      // Use last meaningful path segment as label
+      const segments = u.pathname.split('/').filter(Boolean);
+      return segments.length > 0 ? segments[segments.length - 1] : u.hostname;
+    } catch {
+      return url;
+    }
+  }
+
+  extractPackageLabel(pkg: string): string {
+    if (!this.isUrl(pkg)) return pkg;
+    try {
+      const u = new URL(pkg);
+      // For package URLs, show path without leading slash
+      return u.pathname.replace(/^\//, '') || u.hostname;
+    } catch {
+      return pkg;
+    }
+  }
+
+  getLicenseCategoryCount(category: string): number {
+    return this.licenses
+      .filter(l => l.category === category)
+      .reduce((sum, l) => sum + l.package_count, 0);
   }
 
   isCopyleft(license: string): boolean {
