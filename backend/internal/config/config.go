@@ -17,7 +17,7 @@ type S3BucketConfig struct {
 	SecretKey    string `json:"secretKey"`
 	Prefix       string `json:"prefix"`
 	UsePathStyle bool   `json:"usePathStyle"`
-	UseSSL       bool   `json:"useSSL"`
+	UseSSL       *bool  `json:"useSSL"`
 }
 
 // Config holds all configuration values, read from environment variables.
@@ -101,7 +101,7 @@ func Load() (*Config, error) {
 			SecretKey:    getEnv("S3_SECRET_KEY", ""),
 			Prefix:       getEnv("S3_PREFIX", ""),
 			UsePathStyle: getEnvBool("S3_USE_PATH_STYLE", false),
-			UseSSL:       getEnvBool("S3_USE_SSL", true),
+			UseSSL:       boolPtr(getEnvBool("S3_USE_SSL", true)),
 		})
 	}
 
@@ -184,6 +184,8 @@ func getEnvBool(key string, fallback bool) bool {
 	}
 	return val == "1" || val == "true" || val == "yes"
 }
+
+func boolPtr(v bool) *bool { return &v }
 
 // S3BucketNames returns a comma-separated list of configured bucket names (for logging).
 func (c *Config) S3BucketNames() string {

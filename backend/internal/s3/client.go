@@ -21,7 +21,7 @@ type BucketConfig struct {
 	SecretKey    string `json:"secretKey"`    // Secret access key (optional for public buckets)
 	Prefix       string `json:"prefix"`       // Key prefix filter (e.g. "k3s-io/")
 	UsePathStyle bool   `json:"usePathStyle"` // Use path-style URLs (required for MinIO)
-	UseSSL       bool   `json:"useSSL"`       // Use HTTPS (default: true for AWS)
+	UseSSL       *bool  `json:"useSSL"`       // Use HTTPS — nil defaults to true, set false for local MinIO
 }
 
 // ObjectInfo holds metadata about a discovered S3 object.
@@ -96,9 +96,12 @@ func newMinioClient(cfg BucketConfig) (*minio.Client, error) {
 	} else if strings.HasPrefix(endpoint, "http://") {
 		opts.Secure = false
 		endpoint = strings.TrimPrefix(endpoint, "http://")
+	} else if cfg.UseSSL != nil {
+		// Explicit useSSL value in JSON config.
+		opts.Secure = *cfg.UseSSL
 	} else {
-		// No scheme — use the explicit UseSSL flag (defaults to true).
-		opts.Secure = cfg.UseSSL
+		// No URL scheme and useSSL not specified — default to HTTPS.
+		opts.Secure = true
 	}
 
 	// Strip trailing slashes.

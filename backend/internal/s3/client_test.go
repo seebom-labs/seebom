@@ -94,8 +94,8 @@ func TestBucketConfig_Defaults(t *testing.T) {
 	if cfg.Endpoint != "" {
 		t.Errorf("expected empty endpoint, got %q", cfg.Endpoint)
 	}
-	if cfg.UseSSL {
-		t.Error("expected UseSSL=false by default (struct zero value)")
+	if cfg.UseSSL != nil {
+		t.Error("expected UseSSL=nil by default (pointer zero value)")
 	}
 	if cfg.UsePathStyle {
 		t.Error("expected UsePathStyle=false by default")
