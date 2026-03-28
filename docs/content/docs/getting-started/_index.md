@@ -24,7 +24,9 @@ description: >
 git clone https://github.com/seebom-labs/seebom.git && cd seebom
 
 # 2. Place your SPDX files in the sboms/ directory
-#    (an example file is included: sboms/_example.spdx.json)
+#    (example files are included — see docs/faq for details)
+#    Included: _example.spdx.json, _example-intoto.spdx.json,
+#              _example-violations.spdx.json, _example.openvex.json
 
 # 3. Start everything
 make dev
@@ -92,4 +94,8 @@ cp .env.example .env
 | `SKIP_OSV` | `false` | Skip vulnerability lookups for fast ingestion |
 | `SKIP_GITHUB_RESOLVE` | `false` | Skip GitHub license resolution |
 | `GITHUB_TOKEN` | *(empty)* | GitHub PAT (increases rate limit to 5000 req/h) |
+
+{{% alert title="Recommended: Set GITHUB_TOKEN" color="warning" %}}
+Without a GitHub token, license resolution is limited to **60 requests per hour** — most container-image SBOMs will have many packages stuck as `NOASSERTION`. Create a [Personal Access Token (classic)](https://github.com/settings/tokens) with **no scopes** and set it in your `.env` file. See [FAQ: Should I use a GitHub token?](/docs/faq/#should-i-use-a-github-token) for details.
+{{% /alert %}}
 

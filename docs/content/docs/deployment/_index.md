@@ -57,6 +57,31 @@ helm install seebom deploy/helm/seebom/ -n seebom -f my-values.yaml \
   --set s3.secretKey="..."
 ```
 
+**Private buckets with an existing Kubernetes Secret (recommended for production):**
+
+Instead of passing credentials as plain Helm values, you can reference a pre-existing Kubernetes Secret — the same pattern used for ClickHouse and GitHub credentials:
+
+```yaml
+s3:
+  buckets: '[{"name":"my-private-bucket","region":"eu-west-1"}]'
+  credentialsSecret:
+    enabled: true
+    secretName: "my-s3-credentials"
+    accessKeyKey: "S3_ACCESS_KEY"   # key inside the Secret
+    secretKeyKey: "S3_SECRET_KEY"   # key inside the Secret
+```
+
+Create the Secret first:
+
+```bash
+kubectl create secret generic my-s3-credentials \
+  --from-literal=S3_ACCESS_KEY="AKIA..." \
+  --from-literal=S3_SECRET_KEY="..." \
+  -n seebom
+```
+
+This avoids storing credentials in Helm values files or command history.
+
 **MinIO (local S3-compatible):**
 
 ```yaml
@@ -168,7 +193,31 @@ ui:
 
 ---
 
-## 6. Full Deployment Example
+## 6. GitHub Token (License Resolution)
+
+SeeBOM resolves unknown package licenses (`NOASSERTION`) by querying the GitHub API. Without a token, you are limited to **60 requests per hour**. With a token, the limit increases to **5,000 req/h**.
+
+**We strongly recommend setting a GitHub token for any production deployment.**
+
+Create a [Personal Access Token (classic)](https://github.com/settings/tokens) with **no scopes required**.
+
+```yaml
+github:
+  token: "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+```
+
+Or pass it securely via `--set`:
+
+```bash
+helm install seebom deploy/helm/seebom/ -n seebom -f values.yaml \
+  --set github.token="ghp_..."
+```
+
+See [FAQ: Should I use a GitHub token?](/docs/faq/#should-i-use-a-github-token) for more details and how to re-ingest after adding a token.
+
+---
+
+## 7. Full Deployment Example
 
 ### S3-based (recommended)
 
@@ -184,7 +233,7 @@ helm install seebom ./deploy/helm/seebom \
 
 ---
 
-## 7. Verifying the Deployment
+## 8. Verifying the Deployment
 
 ```bash
 kubectl get pods -l app.kubernetes.io/name=seebom
@@ -206,5 +255,5 @@ kubectl exec -it $(kubectl get pod -l app.kubernetes.io/component=api-gateway -o
 | **License Policy** | ConfigMap | `kubectl edit configmap` → restart API + Workers |
 | **Custom Theme** | ConfigMap | `kubectl create configmap` → restart UI |
 | **Site Config** | ConfigMap | Helm values `ui.siteConfig.content.*` → restart UI |
-| **S3 credentials** | Secret | `--set s3.accessKey=...` or `kubectl edit secret` |
+| **S3 credentials** | Secret | `--set s3.accessKey=...` or `s3.credentialsSecret` (existing K8s Secret) |
 
