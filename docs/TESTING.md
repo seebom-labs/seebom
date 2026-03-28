@@ -1,6 +1,6 @@
 # SeeBOM – Testing Guide
 
-> **Updated:** 2026-03-12
+> **Updated:** 2026-03-28
 
 ## Quick Start
 
@@ -40,9 +40,9 @@ backend/internal/
 │   └── config_test.go          ← tests for config.Load()
 ├── github/
 │   ├── purl.go
-│   ├── purl_test.go            ← tests for ExtractGitHubRepo (11 PURL patterns)
+│   ├── purl_test.go            ← tests for ExtractGitHubRepo (19 PURL patterns incl. well-known Go module mappings)
 │   ├── resolver.go
-│   └── resolver_test.go        ← tests for Resolve, ResolveWithMetadata, cache (httptest mock)
+│   └── resolver_test.go        ← tests for Resolve, ResolveWithMetadata, cache, well-known overrides (httptest mock)
 ├── license/
 │   ├── checker.go
 │   ├── checker_test.go         ← tests for Categorize, Check, LoadPolicy, etc.
@@ -61,7 +61,7 @@ backend/internal/
 │   └── client_test.go          ← tests for ClassifyKey, ParseURI, ObjectInfo
 ├── spdx/
 │   ├── parser.go
-│   └── parser_test.go          ← tests for Parse (with inline JSON)
+│   └── parser_test.go          ← tests for Parse (plain SPDX + in-toto attestation envelope)
 └── vex/
     ├── parser.go
     └── parser_test.go          ← tests for Parse, normalizeVulnID
@@ -81,16 +81,16 @@ These packages contain only data types (structs) with no logic:
 | Package | Top-Level | Subtests | What's Covered |
 |---------|-----------|----------|---------------|
 | `config` | 7 | 0 | Default values, custom env vars, S3 buckets JSON, single S3 bucket, shared S3 credentials, invalid S3 JSON, S3BucketNames |
-| `github/purl` | 2 | 15 | ExtractGitHubRepo (11 PURL patterns: golang github.com, subpath, pkg:github scheme, non-github, npm, empty, qualifiers, fragments, missing repo, azure submodule, hamba v2), RepoKey (4 patterns) |
-| `github/resolver` | 11 | 0 | Resolve (happy path, cache hit, non-GitHub PURL), ResolveWithMetadata (archived repo, not-found, non-GitHub, cache hit), PreloadCache, PreloadMetadataCache, CacheEntries, MetadataCacheEntries |
+| `github/purl` | 2 | 22 | ExtractGitHubRepo (19 PURL patterns: golang github.com, subpath, pkg:github scheme, well-known Go module mappings for golang.org/x/crypto, gopkg.in/yaml.v3, go.uber.org/zap, k8s.io/client-go, oras.land/oras-go/v2 with version suffix stripping, dario.cat/mergo, go.yaml.in/yaml/v4, unknown non-github, npm, empty, qualifiers, fragments, missing repo, azure submodule, hamba v2), RepoKey (4 patterns) |
+| `github/resolver` | 11 | 0 | Resolve (happy path, cache hit, non-GitHub PURL, well-known mapping resolves golang.org/x/crypto), ResolveWithMetadata (archived repo, not-found, non-GitHub, cache hit), PreloadCache, PreloadMetadataCache, CacheEntries, MetadataCacheEntries |
 | `license` | 24 | 20 | Categorize (14 SPDX IDs incl. BSD-3-Clause, ISC, 0BSD, NOASSERTION, NONE), Check, CheckWithExceptions (blanket + package + prefix), LoadPolicy, LoadExceptions, LoadExceptionsWithFallback (4 scenarios), BuildIndex (empty, All CNCF Projects promoted to blanket, compound OR, compound AND), IsExempt substring matching (package+license, package-any), SplitLicenses (7 patterns), GoTempNamesFiltered, edge cases |
 | `osv` | 6 | 0 | Empty input, mock server, server error, context cancellation, no-vulns response, HydrateVulns cache |
 | `osvutil` | 5 | 35 | ClassifySeverity (16 CVSS scenarios incl. vector strings, database-specific fallback), ParseCVSSScore (8 inputs incl. vectors), ComputeCVSSv3BaseScore (4 scenarios), ExtractFixedVersion (4 scenarios), ExtractAffectedVersions (3 scenarios) |
 | `repo` | 5 | 0 | File scanning (SBOM + VEX detection), empty dir, nested dirs, SHA256 consistency, nonexistent dir |
 | `s3` | 4 | 15 | ClassifyKey (9 patterns incl. _spdx.json, case-insensitive), ParseURI (6 patterns), BucketConfig defaults, ObjectInfo URI |
-| `spdx` | 7 | 7 | Full parse, invalid JSON, empty packages, deterministic SBOM ID, license fallback, GoTempModuleName, CleanPackageName (8 patterns) |
+| `spdx` | 8 | 7 | Full parse, in-toto attestation envelope unwrapping, invalid JSON, empty packages, deterministic SBOM ID, license fallback, GoTempModuleName, CleanPackageName (8 patterns) |
 | `vex` | 5 | 8 | Full parse, invalid JSON, empty doc, normalizeVulnID (9 URL patterns), URL-based vuln @id |
-| **Total** | **76** | **100** | **176 test invocations** |
+| **Total** | **77** | **107** | **184 test invocations** |
 
 ---
 

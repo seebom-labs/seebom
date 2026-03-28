@@ -285,3 +285,77 @@ func TestParse_GoTempModuleName(t *testing.T) {
 		t.Errorf("expected github.com/real/package, got %s", result.Packages.PackageNames[1])
 	}
 }
+
+func TestParse_InTotoAttestation(t *testing.T) {
+	doc := `{
+		"_type": "https://in-toto.io/Statement/v0.1",
+		"predicateType": "https://spdx.dev/Document",
+		"subject": [
+			{
+				"name": "pkg:docker/example/app@latest",
+				"digest": {"sha256": "abc123"}
+			}
+		],
+		"predicate": {
+			"spdxVersion": "SPDX-2.3",
+			"name": "wrapped-sbom",
+			"documentNamespace": "https://example.com/wrapped",
+			"creationInfo": {"created": "2025-06-01T00:00:00Z", "creators": ["Tool: buildkit-v0.28.0"]},
+			"packages": [
+				{
+					"SPDXID": "SPDXRef-Package-foo",
+					"name": "foo",
+					"versionInfo": "1.0.0",
+					"licenseConcluded": "MIT",
+					"licenseDeclared": "MIT",
+					"externalRefs": [
+						{
+							"referenceCategory": "PACKAGE-MANAGER",
+							"referenceType": "purl",
+							"referenceLocator": "pkg:golang/github.com/foo/bar@v1.0.0"
+						}
+					]
+				},
+				{
+					"SPDXID": "SPDXRef-Package-baz",
+					"name": "baz",
+					"versionInfo": "2.0.0",
+					"licenseConcluded": "Apache-2.0",
+					"licenseDeclared": "Apache-2.0",
+					"externalRefs": []
+				}
+			],
+			"relationships": [
+				{
+					"spdxElementId": "SPDXRef-Package-foo",
+					"relationshipType": "DEPENDS_ON",
+					"relatedSpdxElement": "SPDXRef-Package-baz"
+				}
+			]
+		}
+	}`
+
+	result, err := Parse(strings.NewReader(doc), "wrapped.spdx.json", "hash-wrapped")
+	if err != nil {
+		t.Fatalf("Parse() error: %v", err)
+	}
+
+	if result.SBOM.SPDXVersion != "SPDX-2.3" {
+		t.Errorf("expected SPDX-2.3, got %s", result.SBOM.SPDXVersion)
+	}
+	if result.SBOM.DocumentName != "wrapped-sbom" {
+		t.Errorf("expected wrapped-sbom, got %s", result.SBOM.DocumentName)
+	}
+	if len(result.Packages.PackageNames) != 2 {
+		t.Fatalf("expected 2 packages, got %d", len(result.Packages.PackageNames))
+	}
+	if result.Packages.PackageNames[0] != "foo" {
+		t.Errorf("expected foo, got %s", result.Packages.PackageNames[0])
+	}
+	if result.Packages.PackagePURLs[0] != "pkg:golang/github.com/foo/bar@v1.0.0" {
+		t.Errorf("expected purl, got %s", result.Packages.PackagePURLs[0])
+	}
+	if len(result.Packages.RelSourceIndices) != 1 {
+		t.Fatalf("expected 1 relationship, got %d", len(result.Packages.RelSourceIndices))
+	}
+}

@@ -245,17 +245,59 @@ func processSBOMJob(ctx context.Context, cfg *config.Config, chClient *clickhous
 		return nil
 	}
 
-	// 2. Insert SBOM metadata.
+	// 2. Resolve unknown licenses via GitHub API BEFORE inserting into ClickHouse,
+	// so that sbom_packages.package_licenses contains the resolved values.
+	if ghResolver != nil {
+		resolved := 0
+		archived := 0
+		for i, lic := range result.Packages.PackageLicenses {
+			purl := ""
+			if i < len(result.Packages.PackagePURLs) {
+				purl = result.Packages.PackagePURLs[i]
+			}
+			if purl == "" {
+				continue
+			}
+
+			// For unknown licenses, fetch full metadata (license + archived status)
+			if lic == "" || lic == "NOASSERTION" || lic == "NONE" {
+				if meta := ghResolver.ResolveWithMetadata(ctx, purl); meta != nil {
+					if meta.SPDXID != "" {
+						result.Packages.PackageLicenses[i] = meta.SPDXID
+						resolved++
+					}
+					if meta.Archived {
+						archived++
+					}
+				}
+			}
+		}
+		if resolved > 0 {
+			log.Printf("  Resolved %d unknown licenses via GitHub API", resolved)
+		}
+		if archived > 0 {
+			log.Printf("  ⚠️  Found %d packages using ARCHIVED GitHub repos", archived)
+		}
+		// Persist caches to ClickHouse.
+		if entries := ghResolver.CacheEntries(); len(entries) > 0 {
+			_ = chClient.InsertGitHubLicenseCache(ctx, entries)
+		}
+		if metaEntries := ghResolver.MetadataCacheEntries(); len(metaEntries) > 0 {
+			_ = chClient.InsertGitHubRepoMetadata(ctx, metaEntries)
+		}
+	}
+
+	// 3. Insert SBOM metadata.
 	if err := chClient.InsertSBOM(ctx, &result.SBOM); err != nil {
 		return err
 	}
 
-	// 3. Insert package arrays.
+	// 4. Insert package arrays (with resolved licenses).
 	if err := chClient.InsertSBOMPackages(ctx, &result.Packages); err != nil {
 		return err
 	}
 
-	// 4. OSV batch query for vulnerabilities (skippable for fast ingestion).
+	// 5. OSV batch query for vulnerabilities (skippable for fast ingestion).
 	if cfg.SkipOSV {
 		log.Printf("  SKIP_OSV=true, skipping vulnerability scan for %s (%d PURLs)", job.SourceFile, len(result.Packages.PackagePURLs))
 	} else {
@@ -359,48 +401,7 @@ func processSBOMJob(ctx context.Context, cfg *config.Config, chClient *clickhous
 		}
 	}
 
-	// 4b. Resolve unknown licenses via GitHub API + check for archived repos.
-	if ghResolver != nil {
-		resolved := 0
-		archived := 0
-		for i, lic := range result.Packages.PackageLicenses {
-			purl := ""
-			if i < len(result.Packages.PackagePURLs) {
-				purl = result.Packages.PackagePURLs[i]
-			}
-			if purl == "" {
-				continue
-			}
-
-			// For unknown licenses, fetch full metadata (license + archived status)
-			if lic == "" || lic == "NOASSERTION" || lic == "NONE" {
-				if meta := ghResolver.ResolveWithMetadata(ctx, purl); meta != nil {
-					if meta.SPDXID != "" {
-						result.Packages.PackageLicenses[i] = meta.SPDXID
-						resolved++
-					}
-					if meta.Archived {
-						archived++
-					}
-				}
-			}
-		}
-		if resolved > 0 {
-			log.Printf("  Resolved %d unknown licenses via GitHub API", resolved)
-		}
-		if archived > 0 {
-			log.Printf("  ⚠️  Found %d packages using ARCHIVED GitHub repos", archived)
-		}
-		// Persist caches to ClickHouse.
-		if entries := ghResolver.CacheEntries(); len(entries) > 0 {
-			_ = chClient.InsertGitHubLicenseCache(ctx, entries)
-		}
-		if metaEntries := ghResolver.MetadataCacheEntries(); len(metaEntries) > 0 {
-			_ = chClient.InsertGitHubRepoMetadata(ctx, metaEntries)
-		}
-	}
-
-	// 5. License compliance check.
+	// 6. License compliance check (uses the already-resolved licenses).
 	licResults := license.CheckWithExceptions(result.Packages.PackageNames, result.Packages.PackageLicenses, exceptions)
 	if len(licResults) > 0 {
 		licModels := make([]models.LicenseCompliance, len(licResults))

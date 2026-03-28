@@ -72,16 +72,16 @@ backend/internal/
 | Package | Tests | Subtests | What's Covered |
 |---------|-------|----------|---------------|
 | `config` | 7 | 0 | Default values, env vars, S3 buckets JSON, shared credentials |
-| `github/purl` | 2 | 15 | ExtractGitHubRepo (11 PURL patterns), RepoKey |
-| `github/resolver` | 11 | 0 | Resolve, cache, metadata, preload |
+| `github/purl` | 2 | 22 | ExtractGitHubRepo (19 PURL patterns incl. well-known Go module mappings: `golang.org/x/*`, `gopkg.in/*`, `go.uber.org/*`, `k8s.io/*`, `oras.land/*`, `dario.cat/*`, `go.yaml.in/*`), RepoKey |
+| `github/resolver` | 11 | 0 | Resolve (incl. well-known mapping for golang.org/x/crypto), cache, metadata, preload, license overrides |
 | `license` | 24 | 20 | Categorize, Check, policy, exceptions, prefix matching |
 | `osv` | 6 | 0 | QueryBatch, errors, cancellation |
 | `osvutil` | 5 | 35 | Severity, CVSS, fixed versions |
 | `repo` | 5 | 0 | File scanning, SHA256, nested dirs |
 | `s3` | 4 | 15 | ClassifyKey, ParseURI, defaults |
-| `spdx` | 7 | 7 | Full parse, invalid JSON, deterministic IDs |
+| `spdx` | 8 | 7 | Full parse, in-toto attestation envelope unwrapping, invalid JSON, deterministic IDs |
 | `vex` | 5 | 8 | Parse, normalizeVulnID, URL patterns |
-| **Total** | **76** | **100** | **176 test invocations** |
+| **Total** | **77** | **107** | **184 test invocations** |
 
 ## Test Patterns
 

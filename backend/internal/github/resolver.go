@@ -56,6 +56,19 @@ type RepoMetadata struct {
 	SPDXID     string
 }
 
+// knownLicenseOverrides maps GitHub repos (lowercase "owner/repo") to their correct
+// SPDX license IDs. GitHub's license detection sometimes returns "Other" / NOASSERTION
+// for repos with non-standard LICENSE file formats or dual-license setups.
+// These have been verified manually.
+var knownLicenseOverrides = map[string]string{
+	"opencontainers/go-digest": "Apache-2.0",
+	"shopspring/decimal":       "MIT",
+	"go-yaml/yaml":             "Apache-2.0",
+	"go-tomb/tomb":             "BSD-3-Clause",
+	"go-inf/inf":               "BSD-3-Clause",
+	"go-check/check":           "BSD-2-Clause",
+}
+
 // Resolver resolves unknown package licenses by querying the GitHub API.
 type Resolver struct {
 	token         string
@@ -103,6 +116,15 @@ func (r *Resolver) Resolve(ctx context.Context, purl string) string {
 	}
 
 	spdxID := r.fetchLicense(ctx, owner, repo)
+
+	// Fallback: use manually verified overrides for repos where GitHub
+	// returns "Other" / NOASSERTION despite having a valid LICENSE file.
+	if spdxID == "" {
+		if override, ok := knownLicenseOverrides[key]; ok {
+			spdxID = override
+		}
+	}
+
 	r.licenseCache.Store(key, spdxID)
 
 	if spdxID != "" {
@@ -282,9 +304,28 @@ func (r *Resolver) fetchRepoMetadata(ctx context.Context, owner, repo string) *R
 		}
 	}
 
-	// Extract license
+	// Extract license from repo response.
 	if rr.License != nil && rr.License.SPDXID != "" && rr.License.SPDXID != "NOASSERTION" {
 		meta.SPDXID = rr.License.SPDXID
+	}
+
+	// Fallback: if the repo API didn't return a usable license, try the dedicated
+	// /repos/{owner}/{repo}/license endpoint which does deeper file analysis.
+	if meta.SPDXID == "" {
+		if err := r.limiter.Wait(ctx); err == nil {
+			if spdxID := r.fetchLicense(ctx, owner, repo); spdxID != "" {
+				meta.SPDXID = spdxID
+			}
+		}
+	}
+
+	// Last resort: use manually verified overrides for repos where GitHub
+	// returns "Other" / NOASSERTION despite having a valid LICENSE file.
+	if meta.SPDXID == "" {
+		key := strings.ToLower(owner + "/" + repo)
+		if override, ok := knownLicenseOverrides[key]; ok {
+			meta.SPDXID = override
+		}
 	}
 
 	return meta

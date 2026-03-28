@@ -391,8 +391,10 @@ func (c *Client) QueryDependencyStats(ctx context.Context, limit uint64) (*dto.D
 	// Top N most-used dependencies across all projects.
 	// project_count = distinct projects, not SBOMs. We derive the project key from
 	// source_file by extracting the first two path segments (org/repo) which are
-	// stable across versions. For local files, we fall back to document_name.
+	// stable across versions. For local files we fall back to document_name.
 	// This avoids counting multiple releases of the same project separately.
+	// Note: ClickHouse does not allow "TABLE FINAL AS alias" with ARRAY JOIN,
+	// so we wrap sbom_packages in a subquery.
 	rows, err := c.Conn.Query(ctx, `
 		SELECT
 			dep_name,
@@ -401,10 +403,8 @@ func (c *Client) QueryDependencyStats(ctx context.Context, limit uint64) (*dto.D
 				multiIf(
 					position(source_file, 's3://') = 1,
 					arrayStringConcat(
-						arraySlice(
-							splitByChar('/', replaceOne(source_file, 's3://', '')),
-							2, 2
-						), '/'
+						arraySlice(splitByChar('/', replaceOne(source_file, 's3://', '')), 2, 2),
+						'/'
 					),
 					doc_name != '',
 					doc_name,
@@ -414,7 +414,6 @@ func (c *Client) QueryDependencyStats(ctx context.Context, limit uint64) (*dto.D
 			groupArray(DISTINCT dep_version) AS versions
 		FROM (
 			SELECT
-				p.sbom_id,
 				p.source_file,
 				ifNull(s.document_name, p.source_file) AS doc_name,
 				dep_name,

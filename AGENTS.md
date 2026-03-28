@@ -21,8 +21,8 @@ Key shared packages:
 - `internal/license` – License compliance + externalized policy + exceptions with prefix-matching
 - `internal/osv` – OSV API client with rate limiting and exponential backoff
 - `internal/s3` – S3-compatible bucket client (AWS S3, MinIO, GCS) for streaming SBOM ingestion from multiple buckets
-- `internal/github` – GitHub API client for resolving unknown licenses from PURL (rate-limited, cached)
-- `internal/spdx` – SPDX JSON streaming parser
+- `internal/github` – GitHub API client for resolving unknown licenses from PURL (rate-limited, cached). Includes 50+ well-known Go module→GitHub repo mappings (`golang.org/x/*`, `gopkg.in/*`, `go.uber.org/*`, `k8s.io/*`, `oras.land/*`, `dario.cat/*`, etc.), fallback to the dedicated `/repos/{owner}/{repo}/license` endpoint, and static license overrides for repos where GitHub misdetects the license.
+- `internal/spdx` – SPDX JSON streaming parser. Supports both plain SPDX documents and **in-toto attestation envelopes** where the SPDX content is wrapped inside the `predicate` field (common with Syft/BuildKit-generated container SBOMs).
 - `internal/vex` – OpenVEX parser with URL normalization
 
 Data layer (`pkg/`):
@@ -45,6 +45,8 @@ Data layer (`pkg/`):
 **Config-Driven Governance:** License policy (`license-policy.json`) and license exceptions (`license-exceptions.json`) are externalized as config files – mounted via Docker Compose volumes locally and Kubernetes ConfigMaps in production. The frontend is public, so no write APIs for exceptions exist. Changes require config file updates + re-ingest.
 
 **CVE Refresh Strategy:** New CVEs are discovered via a lightweight daily CronJob (`cve-refresher`) that queries all unique PURLs (~20k) against the OSV API in 1000-PURL batch chunks, deduplicates against existing vulnerabilities, and inserts new findings. This avoids expensive full re-scans of all SBOMs.
+
+**Parsing Pipeline Order:** The parsing worker processes each SBOM in a strict order: (1) Parse SPDX JSON (with in-toto unwrapping), (2) Resolve unknown licenses via GitHub API, (3) Insert SBOM metadata + packages with resolved licenses into ClickHouse, (4) Query OSV for vulnerabilities, (5) Check license compliance. License resolution **must** happen before ClickHouse inserts so that `sbom_packages.package_licenses` contains the resolved values from the start — the dependency tree API reads directly from this column.
 
 # Executable Commands
 

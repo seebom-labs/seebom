@@ -110,13 +110,39 @@ func cleanPackageName(name, purl, spdxID string) string {
 	return name
 }
 
-// Parse reads an SPDX JSON document from a reader and extracts models.
-func Parse(r io.Reader, sourceFile, sha256Hash string) (*ParseResult, error) {
-	var doc SPDXDocument
+// inTotoStatement represents an in-toto attestation envelope.
+// Some SBOM generators (e.g. buildkit, Anchore/Syft) wrap SPDX documents inside
+// this format. The actual SPDX content lives under the "predicate" key.
+type inTotoStatement struct {
+	PredicateType string          `json:"predicateType"`
+	Predicate     json.RawMessage `json:"predicate"`
+}
 
-	decoder := json.NewDecoder(r)
-	if err := decoder.Decode(&doc); err != nil {
+// Parse reads an SPDX JSON document from a reader and extracts models.
+// Supports both plain SPDX JSON and in-toto attestation envelopes where the
+// SPDX document is wrapped inside the "predicate" field.
+func Parse(r io.Reader, sourceFile, sha256Hash string) (*ParseResult, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read SPDX data: %w", err)
+	}
+
+	var doc SPDXDocument
+	if err := json.Unmarshal(data, &doc); err != nil {
 		return nil, fmt.Errorf("failed to decode SPDX JSON: %w", err)
+	}
+
+	// If spdxVersion is empty, the file may be an in-toto attestation envelope.
+	// Try to unwrap the SPDX document from the "predicate" field.
+	if doc.SPDXVersion == "" {
+		var stmt inTotoStatement
+		if err := json.Unmarshal(data, &stmt); err == nil &&
+			len(stmt.Predicate) > 0 &&
+			strings.Contains(stmt.PredicateType, "spdx") {
+			if err := json.Unmarshal(stmt.Predicate, &doc); err != nil {
+				return nil, fmt.Errorf("failed to decode SPDX from in-toto predicate: %w", err)
+			}
+		}
 	}
 
 	sbomID := uuid.NewSHA1(uuid.NameSpaceDNS, []byte(sha256Hash))

@@ -298,10 +298,13 @@ sboms/*.spdx.json + *.openvex.json
              │
              ▼
 ┌─────────────────────────┐
-│   Parsing Workers (N)   │  Stateless: claims jobs, parses SPDX/VEX,
-│   (Go binary)           │  queries OSV for vulns, resolves unknown licenses
-│                         │  via GitHub API, checks license compliance,
-│                         │  batch-INSERTs into ClickHouse
+│   Parsing Workers (N)   │  Stateless: claims jobs, parses SPDX/VEX
+│   (Go binary)           │  (supports plain SPDX + in-toto attestation
+│                         │  envelopes), resolves unknown licenses via
+│                         │  GitHub API (50+ well-known Go module mappings),
+│                         │  batch-INSERTs resolved data into ClickHouse,
+│                         │  then queries OSV for vulns and checks license
+│                         │  compliance
 └────────────┬────────────┘
              │
              ▼
@@ -331,6 +334,20 @@ sboms/*.spdx.json + *.openvex.json
 │                         │  CSS custom properties theming
 └─────────────────────────┘
 ```
+
+### Parsing Pipeline
+
+The Parsing Worker processes each SBOM in a carefully ordered pipeline:
+
+1. **Parse** — Decode SPDX JSON (supports plain SPDX and in-toto attestation envelopes where SPDX is wrapped in the `predicate` field)
+2. **Resolve Licenses** — For packages with `NOASSERTION`/empty licenses, query the GitHub API using three resolution strategies:
+   - Direct `github.com/{owner}/{repo}` extraction from PURLs
+   - **Well-known Go module mappings** (50+ entries: `golang.org/x/*` → `golang/*`, `gopkg.in/*`, `go.uber.org/*`, `k8s.io/*`, `dario.cat/mergo`, etc.)
+   - **Fallback** to the dedicated GitHub `/repos/{owner}/{repo}/license` endpoint
+   - **Static overrides** for repos where GitHub misdetects the license (e.g., `opencontainers/go-digest`, `shopspring/decimal`)
+3. **Insert** — Batch-INSERT SBOM metadata and packages (with resolved licenses) into ClickHouse
+4. **Scan Vulnerabilities** — OSV batch query for all PURLs
+5. **Check License Compliance** — Classify licenses against the policy and apply exceptions
 
 See [docs/ARCHITECTURE_PLAN.md](docs/ARCHITECTURE_PLAN.md) for the full blueprint.  
 See [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md) for Kubernetes deployment.  

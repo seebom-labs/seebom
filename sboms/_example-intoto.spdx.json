@@ -1,0 +1,186 @@
+{
+  "_type": "https://in-toto.io/Statement/v0.1",
+  "predicateType": "https://spdx.dev/Document",
+  "subject": [
+    {
+      "name": "ghcr.io/example-org/example-server",
+      "digest": {
+        "sha256": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+      }
+    }
+  ],
+  "predicate": {
+    "spdxVersion": "SPDX-2.3",
+    "dataLicense": "CC0-1.0",
+    "SPDXID": "SPDXRef-DOCUMENT",
+    "name": "example-server",
+    "documentNamespace": "https://example.com/sbom/example-server-v2.1.0",
+    "creationInfo": {
+      "created": "2026-03-15T12:00:00Z",
+      "creators": [
+        "Tool: syft-1.40.0",
+        "Tool: buildkit-0.28.0"
+      ],
+      "licenseListVersion": "3.25"
+    },
+    "packages": [
+      {
+        "SPDXID": "SPDXRef-DocumentRoot-Image-example-server",
+        "name": "example-server",
+        "versionInfo": "2.1.0",
+        "downloadLocation": "NOASSERTION",
+        "licenseConcluded": "NOASSERTION",
+        "licenseDeclared": "NOASSERTION",
+        "externalRefs": []
+      },
+      {
+        "SPDXID": "SPDXRef-Package-apk-alpine-baselayout-data",
+        "name": "alpine-baselayout-data",
+        "versionInfo": "3.7.1-r8",
+        "downloadLocation": "https://git.alpinelinux.org/aports",
+        "licenseConcluded": "NOASSERTION",
+        "licenseDeclared": "GPL-2.0-only",
+        "externalRefs": [
+          { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:apk/alpine/alpine-baselayout-data@3.7.1-r8?arch=noarch&distro=alpine-3.21" }
+        ]
+      },
+      {
+        "SPDXID": "SPDXRef-Package-apk-ca-certificates-bundle",
+        "name": "ca-certificates-bundle",
+        "versionInfo": "20251003-r0",
+        "downloadLocation": "https://git.alpinelinux.org/aports",
+        "licenseConcluded": "NOASSERTION",
+        "licenseDeclared": "MPL-2.0",
+        "externalRefs": [
+          { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:apk/alpine/ca-certificates-bundle@20251003-r0?arch=noarch&distro=alpine-3.21" }
+        ]
+      },
+      {
+        "SPDXID": "SPDXRef-Package-go-module-spf13-cobra",
+        "name": "github.com/spf13/cobra",
+        "versionInfo": "v1.10.2",
+        "downloadLocation": "NOASSERTION",
+        "licenseConcluded": "NOASSERTION",
+        "licenseDeclared": "NOASSERTION",
+        "externalRefs": [
+          { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:golang/github.com/spf13/cobra@v1.10.2" }
+        ]
+      },
+      {
+        "SPDXID": "SPDXRef-Package-go-module-spf13-pflag",
+        "name": "github.com/spf13/pflag",
+        "versionInfo": "v1.0.10",
+        "downloadLocation": "NOASSERTION",
+        "licenseConcluded": "NOASSERTION",
+        "licenseDeclared": "NOASSERTION",
+        "externalRefs": [
+          { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:golang/github.com/spf13/pflag@v1.0.10" }
+        ]
+      },
+      {
+        "SPDXID": "SPDXRef-Package-go-module-sirupsen-logrus",
+        "name": "github.com/sirupsen/logrus",
+        "versionInfo": "v1.9.4",
+        "downloadLocation": "NOASSERTION",
+        "licenseConcluded": "NOASSERTION",
+        "licenseDeclared": "NOASSERTION",
+        "externalRefs": [
+          { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:golang/github.com/sirupsen/logrus@v1.9.4" }
+        ]
+      },
+      {
+        "SPDXID": "SPDXRef-Package-go-module-google-uuid",
+        "name": "github.com/google/uuid",
+        "versionInfo": "v1.6.0",
+        "downloadLocation": "NOASSERTION",
+        "licenseConcluded": "NOASSERTION",
+        "licenseDeclared": "NOASSERTION",
+        "externalRefs": [
+          { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:golang/github.com/google/uuid@v1.6.0" }
+        ]
+      },
+      {
+        "SPDXID": "SPDXRef-Package-go-module-golang-x-crypto",
+        "name": "golang.org/x/crypto",
+        "versionInfo": "v0.48.0",
+        "downloadLocation": "NOASSERTION",
+        "licenseConcluded": "NOASSERTION",
+        "licenseDeclared": "NOASSERTION",
+        "externalRefs": [
+          { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:golang/golang.org/x/crypto@v0.48.0" }
+        ]
+      },
+      {
+        "SPDXID": "SPDXRef-Package-go-module-golang-x-sys",
+        "name": "golang.org/x/sys",
+        "versionInfo": "v0.42.0",
+        "downloadLocation": "NOASSERTION",
+        "licenseConcluded": "NOASSERTION",
+        "licenseDeclared": "NOASSERTION",
+        "externalRefs": [
+          { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:golang/golang.org/x/sys@v0.42.0" }
+        ]
+      },
+      {
+        "SPDXID": "SPDXRef-Package-go-module-golang-x-text",
+        "name": "golang.org/x/text",
+        "versionInfo": "v0.34.0",
+        "downloadLocation": "NOASSERTION",
+        "licenseConcluded": "NOASSERTION",
+        "licenseDeclared": "NOASSERTION",
+        "externalRefs": [
+          { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:golang/golang.org/x/text@v0.34.0" }
+        ]
+      },
+      {
+        "SPDXID": "SPDXRef-Package-go-module-gopkg-yaml-v3",
+        "name": "gopkg.in/yaml.v3",
+        "versionInfo": "v3.0.1",
+        "downloadLocation": "NOASSERTION",
+        "licenseConcluded": "NOASSERTION",
+        "licenseDeclared": "NOASSERTION",
+        "externalRefs": [
+          { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:golang/gopkg.in/yaml.v3@v3.0.1" }
+        ]
+      },
+      {
+        "SPDXID": "SPDXRef-Package-go-module-uber-zap",
+        "name": "go.uber.org/zap",
+        "versionInfo": "v1.26.0",
+        "downloadLocation": "NOASSERTION",
+        "licenseConcluded": "NOASSERTION",
+        "licenseDeclared": "NOASSERTION",
+        "externalRefs": [
+          { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:golang/go.uber.org/zap@v1.26.0" }
+        ]
+      },
+      {
+        "SPDXID": "SPDXRef-Package-go-module-stdlib",
+        "name": "stdlib",
+        "versionInfo": "go1.24.1",
+        "downloadLocation": "NOASSERTION",
+        "licenseConcluded": "NOASSERTION",
+        "licenseDeclared": "BSD-3-Clause",
+        "externalRefs": [
+          { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:golang/stdlib@1.24.1" }
+        ]
+      }
+    ],
+    "relationships": [
+      { "spdxElementId": "SPDXRef-DOCUMENT", "relationshipType": "DESCRIBES", "relatedSpdxElement": "SPDXRef-DocumentRoot-Image-example-server" },
+      { "spdxElementId": "SPDXRef-DocumentRoot-Image-example-server", "relationshipType": "CONTAINS", "relatedSpdxElement": "SPDXRef-Package-apk-alpine-baselayout-data" },
+      { "spdxElementId": "SPDXRef-DocumentRoot-Image-example-server", "relationshipType": "CONTAINS", "relatedSpdxElement": "SPDXRef-Package-apk-ca-certificates-bundle" },
+      { "spdxElementId": "SPDXRef-Package-go-module-spf13-cobra", "relationshipType": "DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-DocumentRoot-Image-example-server" },
+      { "spdxElementId": "SPDXRef-Package-go-module-spf13-pflag", "relationshipType": "DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-DocumentRoot-Image-example-server" },
+      { "spdxElementId": "SPDXRef-Package-go-module-sirupsen-logrus", "relationshipType": "DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-DocumentRoot-Image-example-server" },
+      { "spdxElementId": "SPDXRef-Package-go-module-google-uuid", "relationshipType": "DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-DocumentRoot-Image-example-server" },
+      { "spdxElementId": "SPDXRef-Package-go-module-golang-x-crypto", "relationshipType": "DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-DocumentRoot-Image-example-server" },
+      { "spdxElementId": "SPDXRef-Package-go-module-golang-x-sys", "relationshipType": "DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-DocumentRoot-Image-example-server" },
+      { "spdxElementId": "SPDXRef-Package-go-module-golang-x-text", "relationshipType": "DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-DocumentRoot-Image-example-server" },
+      { "spdxElementId": "SPDXRef-Package-go-module-gopkg-yaml-v3", "relationshipType": "DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-DocumentRoot-Image-example-server" },
+      { "spdxElementId": "SPDXRef-Package-go-module-uber-zap", "relationshipType": "DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-DocumentRoot-Image-example-server" },
+      { "spdxElementId": "SPDXRef-Package-go-module-stdlib", "relationshipType": "DEPENDENCY_OF", "relatedSpdxElement": "SPDXRef-DocumentRoot-Image-example-server" }
+    ]
+  }
+}
+

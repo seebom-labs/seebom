@@ -62,7 +62,7 @@ spec:
                     name: {{ .Release.Name }}-config
                 - secretRef:
                     name: {{ .Release.Name }}-secret
-               {{- if .Values.s3.credentialsSecret.enabled }}
+              {{- if .Values.s3.credentialsSecret.enabled }}
               env:
                 - name: S3_ACCESS_KEY
                   valueFrom:

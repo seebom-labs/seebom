@@ -51,9 +51,16 @@ func TestResolve_NonGitHubPURL(t *testing.T) {
 		t.Errorf("Resolve(npm) = %q, want empty string", result)
 	}
 
+	// golang.org/x/crypto resolves now via well-known mapping → github.com/golang/crypto
 	result = resolver.Resolve(context.Background(), "pkg:golang/golang.org/x/crypto@v0.21.0")
+	if result == "" {
+		t.Error("Resolve(golang.org/x/crypto) should resolve via well-known mapping, got empty string")
+	}
+
+	// Truly unknown non-GitHub Go module
+	result = resolver.Resolve(context.Background(), "pkg:golang/some.unknown.domain/pkg@v1.0.0")
 	if result != "" {
-		t.Errorf("Resolve(golang.org) = %q, want empty string", result)
+		t.Errorf("Resolve(unknown domain) = %q, want empty string", result)
 	}
 
 	result = resolver.Resolve(context.Background(), "")
