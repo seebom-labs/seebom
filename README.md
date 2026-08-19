@@ -541,6 +541,17 @@ kubectl edit configmap bomhort-license-policy -n bomhort
 
 ---
 
+## Subprojects
+
+The `seebom-labs` organization hosts additional BOMHort subprojects:
+
+- [BOMcompare](https://github.com/seebom-labs/BOMcompare) — Lightweight SBOM comparison tool.
+- [bomhort-website](https://github.com/seebom-labs/bomhort-website) — Public website and landing pages for BOMHort.
+
+See all repositories: <https://github.com/seebom-labs>
+
+---
+
 ## Contributing
 
 We welcome contributions! See the [Contributing Guide](CONTRIBUTING.md) for how to get started.
